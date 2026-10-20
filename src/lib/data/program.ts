@@ -65,9 +65,12 @@ export type Plan = {
   /** Sculpt style: an all-out set appended to the end of a day. */
   finishers?: Record<PhaseId, Partial<Record<DayKey, Slot>>>;
   restSec: Record<PhaseId, number>;
-  warmUp: string[];
-  coolDown: string[];
+  warmUp: PrepMove[];
+  coolDown: PrepMove[];
 };
+
+/** A warm-up or cool-down move. `figure` keys PREP_ILLUSTRATIONS or ILLUSTRATIONS; omitted means the session's first move. */
+export type PrepMove = { name: string; dose: string; figure?: string };
 
 const s = (id: string, sets: number, amount: number): Slot => ({ id, sets, amount });
 const r = (id: string, sets: number, lo: number, hi: number): Slot => ({ id, sets, amount: hi, range: [lo, hi] });
@@ -457,17 +460,17 @@ export const PLANS: Record<PlanId, Plan> = {
     templates: SHAPE_TEMPLATES,
     restSec: { foundation: 60, build: 60, sculpt: 45 },
     warmUp: [
-      "March on the spot, 60 s",
-      "Arm circles forward and back, 10 each",
-      "Hip circles, 10 each way",
-      "Bodyweight good mornings, 10 slow",
-      "Glute bridges, 10 easy",
+      { name: "March on the spot", dose: "60 s", figure: "march" },
+      { name: "Arm circles, forward and back", dose: "10 each", figure: "arm-circles" },
+      { name: "Hip circles", dose: "10 each way", figure: "hip-circles" },
+      { name: "Bodyweight good mornings", dose: "10 slow", figure: "hip-hinge" },
+      { name: "Glute bridges", dose: "10 easy", figure: "glute-bridge" },
     ],
     coolDown: [
-      "Figure-four glute stretch, 30 s each side",
-      "Kneeling hip-flexor stretch, 30 s each side",
-      "Doorway chest stretch, 30 s",
-      "Child's pose, 45 s",
+      { name: "Figure-four glute stretch", dose: "30 s each side", figure: "figure-four" },
+      { name: "Kneeling hip-flexor stretch", dose: "30 s each side", figure: "hip-flexor" },
+      { name: "Doorway chest stretch", dose: "30 s", figure: "chest-stretch" },
+      { name: "Child's pose", dose: "45 s", figure: "childs-pose" },
     ],
   },
   ppl: {
@@ -496,17 +499,17 @@ export const PLANS: Record<PlanId, Plan> = {
     templates: PPL_TEMPLATES,
     restSec: { foundation: 75, build: 75, sculpt: 60 },
     warmUp: [
-      "Jumping jacks, 60 s",
-      "Arm circles forward and back, 10 each",
-      "Band-free pull-aparts with your arms, 15",
-      "Bodyweight squats, 10",
-      "One light warm-up set of the first move",
+      { name: "Jumping jacks", dose: "60 s", figure: "jumping-jacks" },
+      { name: "Arm circles, forward and back", dose: "10 each", figure: "arm-circles" },
+      { name: "Pull-aparts, arms only", dose: "15", figure: "pull-apart" },
+      { name: "Bodyweight squats", dose: "10", figure: "squat" },
+      { name: "Light set of your first move", dose: "1 set, about half weight" },
     ],
     coolDown: [
-      "Doorway chest stretch, 30 s",
-      "Lat stretch against a wall, 30 s each side",
-      "Overhead triceps stretch, 30 s each side",
-      "Standing quad stretch, 30 s each side",
+      { name: "Doorway chest stretch", dose: "30 s", figure: "chest-stretch" },
+      { name: "Lat stretch against a wall", dose: "30 s each side", figure: "lat-stretch" },
+      { name: "Overhead triceps stretch", dose: "30 s each side", figure: "triceps-stretch" },
+      { name: "Standing quad stretch", dose: "30 s each side", figure: "quad-stretch" },
     ],
   },
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EXERCISES } from "./data/exercises";
-import { ILLUSTRATIONS } from "./data/illustrations";
+import { ILLUSTRATIONS, PREP_ILLUSTRATIONS } from "./data/illustrations";
+import { PLAN_LIST } from "./data/program";
 import { BONES, resolveIllustration, solveJoint, type Frame } from "./figure";
 
 const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -24,7 +25,15 @@ describe("illustrations", () => {
     for (const e of EXERCISES) expect(ILLUSTRATIONS[e.id], e.id).toBeDefined();
   });
 
-  const frames = Object.entries(ILLUSTRATIONS).flatMap(([id, ill]) => {
+  it("covers every warm-up and cool-down move", () => {
+    for (const plan of PLAN_LIST) {
+      for (const m of [...plan.warmUp, ...plan.coolDown]) {
+        if (m.figure) expect(PREP_ILLUSTRATIONS[m.figure] ?? ILLUSTRATIONS[m.figure], m.name).toBeDefined();
+      }
+    }
+  });
+
+  const frames = Object.entries({ ...ILLUSTRATIONS, ...PREP_ILLUSTRATIONS }).flatMap(([id, ill]) => {
     const { start, end } = resolveIllustration(ill);
     return [
       [id, "start", start],

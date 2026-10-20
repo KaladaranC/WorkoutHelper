@@ -38,7 +38,7 @@ camera → usePoseCamera (components/coach)   one landmarker, rAF loop, skeleton
 
 ## Exercise illustrations
 
-Each move has a start and finish pose in `lib/data/illustrations.ts`. Only hips, shoulders, hands and feet are placed by hand. `lib/figure.ts` solves elbows and knees with two-bone IK so proportions stay consistent. `components/figure/` renders them: `MoveThumb` for lists, `MoveFrame` for stills, and `MoveAnimation` for the looping tutorial (autoplays unless reduced motion is on, then waits for Play). The primary-colour ring marks the joint the camera measures. `figure.test.ts` checks that every exercise has a pose and nothing goes through the floor. Coordinates: floor at y = 0, y up, side views face +x.
+Each move has a start and finish pose in `lib/data/illustrations.ts`. Only hips, shoulders, hands and feet are placed by hand. `lib/figure.ts` solves elbows and knees with two-bone IK so proportions stay consistent. `components/figure/` renders them: `MoveThumb` for lists, `MoveFrame` for stills, and `MoveAnimation` for the looping tutorial (autoplays unless reduced motion is on, then waits for Play). The primary-colour ring marks the joint the camera measures. Warm-up and cool-down moves (`warmUp`/`coolDown` in `program.ts`) use a deliberately different look: `PrepFigure` draws the same poses as line sketches with a dashed start ghost and a motion arrow (or a ring when the illustration has `loop`), shown as a swipeable card strip (`components/session/prep-strip.tsx`). Their poses live in `PREP_ILLUSTRATIONS`, or reuse an exercise pose by id. `figure.test.ts` checks that every exercise has a pose and nothing goes through the floor. Coordinates: floor at y = 0, y up, side views face +x.
 
 ## Key directories
 

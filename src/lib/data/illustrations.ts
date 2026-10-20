@@ -485,3 +485,124 @@ export const ILLUSTRATIONS: Record<string, Illustration> = {
     end: { ...SUPINE, leg: { ankle: [8, 49] } },
   },
 };
+
+// Warm-up and cool-down moves. Drawn as line sketches (components/figure/
+// prep-figure.tsx), so they read as a different kind of thing from the
+// working sets. Moves that already exist above are reused by id.
+export const PREP_ILLUSTRATIONS: Record<string, Illustration> = {
+  march: {
+    view: "side",
+    start: { ...STAND, arm: { wrist: [-8, 52], bend: -1 }, farArm: { wrist: [10, 52], bend: -1 } },
+    end: {
+      ...STAND,
+      leg: { knee: [21, 41], ankle: [20, 20], foot: 0 },
+      farLeg: { ankle: [1, 3] },
+      arm: { wrist: [-10, 54], bend: -1 },
+      farArm: { wrist: [14, 58], bend: -1 },
+    },
+  },
+  "arm-circles": {
+    view: "front",
+    loop: true,
+    start: { ...STAND_FRONT, arm: { wrist: [38, 76] } },
+    end: { ...STAND_FRONT, arm: { wrist: [35, 94] } },
+  },
+  "hip-circles": {
+    view: "front",
+    loop: true,
+    // Hands on hips; feet and shoulders stay put while the hips travel.
+    start: {
+      ...STAND_FRONT,
+      hip: [-5, 46],
+      leg: { ankle: [7, 3] },
+      farLeg: { ankle: [-7, 3] },
+      arm: { wrist: [2, 49], elbow: [21, 62] },
+      farArm: { wrist: [-12, 49], elbow: [-21, 62] },
+    },
+    end: {
+      ...STAND_FRONT,
+      hip: [5, 46],
+      leg: { ankle: [7, 3] },
+      farLeg: { ankle: [-7, 3] },
+      arm: { wrist: [12, 49], elbow: [21, 62] },
+      farArm: { wrist: [-2, 49], elbow: [-21, 62] },
+    },
+  },
+  "pull-apart": {
+    view: "front",
+    start: { ...STAND_FRONT, arm: { wrist: [4, 77], elbow: [12, 72] } },
+    end: { ...STAND_FRONT, arm: { wrist: [39, 79] } },
+  },
+
+  // Cool-down stretches are holds: one position, no end.
+  "figure-four": {
+    view: "side",
+    start: {
+      ...SUPINE,
+      // Far foot lifted, near ankle crossed over the far knee, hands pulling the thigh in.
+      leg: { knee: [22, 15], ankle: [11, 27] },
+      farLeg: { knee: [10, 26], ankle: [25, 21] },
+      arm: { wrist: [8, 21], bend: 1 },
+    },
+  },
+  "hip-flexor": {
+    view: "side",
+    start: {
+      hip: [0, 27],
+      shoulder: [-2, 59],
+      leg: { ankle: [22, 3] },
+      farLeg: { knee: [-16, 4], ankle: [-36, 5], foot: 180 },
+      arm: { wrist: [16, 31], bend: -1 },
+    },
+  },
+  "chest-stretch": {
+    view: "side",
+    props: [{ kind: "wall", x: -16 }],
+    start: {
+      hip: [2, 46],
+      shoulder: [5, 78],
+      leg: { ankle: [12, 3] },
+      farLeg: { ankle: [-8, 3] },
+      arm: { wrist: [-15, 92], elbow: [-10, 78] },
+    },
+  },
+  "childs-pose": {
+    view: "side",
+    start: {
+      hip: [-10, 16],
+      shoulder: [20, 8],
+      head: 8,
+      leg: { knee: [10, 3], ankle: [-13, 3], foot: 180 },
+      arm: { wrist: [46, 3] },
+    },
+  },
+  "lat-stretch": {
+    view: "side",
+    props: [{ kind: "wall", x: 54 }],
+    start: {
+      hip: [-6, 47],
+      shoulder: [24, 54],
+      head: 5,
+      leg: { ankle: [1, 3] },
+      arm: { wrist: [52, 62] },
+    },
+  },
+  "triceps-stretch": {
+    view: "front",
+    start: {
+      ...STAND_FRONT,
+      arm: { wrist: [-2, 86], elbow: [12, 92] },
+      farArm: { wrist: [9, 93], elbow: [-14, 92] },
+    },
+  },
+  "quad-stretch": {
+    view: "side",
+    start: {
+      ...STAND,
+      leg: { knee: [1, 25], ankle: [-12, 41], foot: 100 },
+      farLeg: { ankle: [1, 3] },
+      arm: { wrist: [-13, 43], bend: -1 },
+      farArm: { wrist: [10, 50], bend: -1 },
+    },
+  },
+};

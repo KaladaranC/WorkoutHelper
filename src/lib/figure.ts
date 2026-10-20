@@ -47,6 +47,8 @@ export type Illustration = {
   props?: Prop[];
   /** Draw a dumbbell in each hand. */
   dumbbells?: boolean;
+  /** The move goes round in a circle: warm-up sketches draw a ring, not an arrow. */
+  loop?: boolean;
 };
 
 export type Limbs = {

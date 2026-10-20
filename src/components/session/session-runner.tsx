@@ -8,6 +8,7 @@ import { CoachPanel, type CoachStats } from "@/components/coach/coach-panel";
 import { bandClass } from "@/components/band";
 import { MoveAnimation } from "@/components/figure/move-animation";
 import { MoveRow } from "@/components/move-row";
+import { PrepStrip } from "@/components/session/prep-strip";
 import { findExercise } from "@/lib/data/exercises";
 import { estimateMinutes, findDay, PLANS, type Prescription, type ProgramDay } from "@/lib/data/program";
 import { db, exerciseHistory, finishSession, logSet, openSession, type Session } from "@/lib/db";
@@ -173,11 +174,10 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
         <h2 id="warm" className="text-sm font-semibold text-stage-muted">
           Warm up first, about 5 min
         </h2>
-        <ul className="mt-2 flex flex-col gap-1">
-          {plan.warmUp.map((w) => (
-            <li key={w}>{w}</li>
-          ))}
-        </ul>
+        <p className="mt-1 text-sm text-stage-muted">Swipe through in order. Dashed is where you start.</p>
+        <div className="mt-3">
+          <PrepStrip moves={plan.warmUp} firstMoveId={day.items[0].exercise.id} mood="warm" label="Warm-up moves" />
+        </div>
       </section>
 
       <section aria-labelledby="moves">
@@ -666,11 +666,10 @@ function Summary({ day, sessionId }: { day: ProgramDay; sessionId: string }) {
       )}
       <section>
         <h2 className="text-sm font-semibold text-stage-muted">Cool down</h2>
-        <ul className="mt-2 flex flex-col gap-1">
-          {plan.coolDown.map((c) => (
-            <li key={c}>{c}</li>
-          ))}
-        </ul>
+        <p className="mt-1 text-sm text-stage-muted">Ease into each stretch and breathe slowly. No bouncing.</p>
+        <div className="mt-3">
+          <PrepStrip moves={plan.coolDown} firstMoveId={day.items[0].exercise.id} mood="cool" label="Cool-down stretches" />
+        </div>
       </section>
       <Link
         href="/"
