@@ -27,6 +27,8 @@
   --stage-muted: #a7a3b3;
   --stage-good: #4fd18b;
   --stage-warn: #ffad4d;
+  /* The plan's own colour on the workout stage: coral for sculpt. */
+  --stage-accent: #ff7a66;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,6 +43,22 @@
     --good: #4fd18b;
     --warn: #ffad4d;
     --band-blue: #5b8cf0;
+  }
+}
+
+/* The strength plan wears blue instead of coral, everywhere it shows. Set via
+   data-plan on <html> (from the profile) and on the session stage (from the day).
+   Kept after the dark-mode block so these win at equal specificity. */
+[data-plan="ppl"] {
+  --primary: #2459c7;
+  --primary-foreground: #f4f7ff;
+  --stage-accent: #6aa3ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-plan="ppl"] {
+    --primary: #6aa3ff;
+    --primary-foreground: #06132b;
   }
 }
 
@@ -63,6 +81,7 @@
   --color-stage-muted: var(--stage-muted);
   --color-stage-good: var(--stage-good);
   --color-stage-warn: var(--stage-warn);
+  --color-stage-accent: var(--stage-accent);
 
   --font-sans: var(--font-figtree);
   --font-display: var(--font-shoulders);

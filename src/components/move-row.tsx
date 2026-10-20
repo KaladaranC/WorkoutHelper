@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Camera, ChevronDown, Hand } from "lucide-react";
 import { MoveAnimation } from "@/components/figure/move-animation";
 import { MoveThumb } from "@/components/figure/move-figure";
-import type { Prescription } from "@/lib/data/program";
+import { targetLabel, type Prescription } from "@/lib/data/program";
 import { cn } from "@/lib/utils";
 
 const TONE = {
@@ -34,10 +34,8 @@ export function MoveRow({ p, tone = "page" }: { p: Prescription; tone?: keyof ty
           <span className="block font-semibold">{e.name}</span>
           <span className={cn("block text-sm", t.muted)}>{e.muscles}</span>
         </span>
-        <span className={cn("font-mono text-sm tabular-nums", t.muted)}>
-          {p.sets}×{p.amount}
-          {e.unit === "seconds" ? "s" : ""}
-          {e.perSide ? "/side" : ""}
+        <span className={cn("text-right font-mono text-sm tabular-nums", p.finisher ? "font-semibold" : t.muted)}>
+          {targetLabel(p)}
         </span>
         {e.tracking.kind === "manual" ? (
           <Hand className={cn("size-4", t.muted)} aria-label="Counted by hand" />

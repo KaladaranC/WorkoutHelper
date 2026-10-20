@@ -26,12 +26,25 @@ type Props = {
   cameraDefault: boolean;
   /** Progress so far in this set, so remounting the panel doesn't reset it. */
   initial?: CoachStats;
+  /** Spoken when the target is reached; each plan has its own voice. */
+  doneLine?: string;
+  /** Spoken once on reaching a rep count, e.g. the bottom of a rep range. */
+  milestone?: { at: number; text: string };
   onStats: (stats: CoachStats) => void;
 };
 
 const EMPTY: CoachStats = { done: 0, goodReps: 0, partials: 0, cues: {}, tracked: false };
 
-export function CoachPanel({ exercise, target, model, cameraDefault, initial, onStats }: Props) {
+export function CoachPanel({
+  exercise,
+  target,
+  model,
+  cameraDefault,
+  initial,
+  doneLine,
+  milestone,
+  onStats,
+}: Props) {
   const tracking = exercise.tracking;
   const canTrack = tracking.kind !== "manual";
   const [useCamera, setUseCamera] = useState(canTrack && cameraDefault);
@@ -48,6 +61,7 @@ export function CoachPanel({ exercise, target, model, cameraDefault, initial, on
   const half = exercise.perSide ? target / 2 : null;
   const announced = useRef({
     half: half !== null && stats.done >= half,
+    milestone: milestone !== undefined && stats.done >= milestone.at,
     done: stats.done >= target,
   });
   useEffect(() => {
@@ -56,11 +70,15 @@ export function CoachPanel({ exercise, target, model, cameraDefault, initial, on
       announced.current.half = true;
       speak("Switch sides", { interrupt: unit === "reps" ? false : true });
     }
+    if (milestone && !announced.current.milestone && stats.done >= milestone.at && stats.done < target) {
+      announced.current.milestone = true;
+      speak(milestone.text);
+    }
     if (!announced.current.done && stats.done >= target) {
       announced.current.done = true;
-      speak(unit === "reps" ? "Set complete. Nice work." : "Time. Well held.");
+      speak(unit === "reps" ? (doneLine ?? "Set complete. Nice work.") : "Time. Well held.");
     }
-  }, [stats.done, half, target, exercise.unit]);
+  }, [stats.done, half, target, exercise.unit, milestone, doneLine]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

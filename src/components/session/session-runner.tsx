@@ -3,20 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, Minus, Plus, SkipForward, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Flame, Minus, Plus, SkipForward, Trophy, X } from "lucide-react";
 import { CoachPanel, type CoachStats } from "@/components/coach/coach-panel";
 import { bandClass } from "@/components/band";
 import { MoveAnimation } from "@/components/figure/move-animation";
 import { MoveRow } from "@/components/move-row";
+import { findExercise } from "@/lib/data/exercises";
 import { estimateMinutes, findDay, PLANS, type Prescription, type ProgramDay } from "@/lib/data/program";
-import { db, finishSession, lastWeight, logSet, openSession, type Session } from "@/lib/db";
+import { db, exerciseHistory, finishSession, logSet, openSession, type Session } from "@/lib/db";
 import { useProfile, useSessions } from "@/lib/hooks";
+import { EFFORT_LABEL, suggestNext, type Effort, type Suggestion } from "@/lib/progression";
 import { speak } from "@/lib/speech";
 import { cn, formatSeconds } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
 
 type Cursor = { item: number; set: number };
 type Stage = "overview" | "set" | "rest" | "summary";
+type SetResult = { weightKg?: number; effort?: Effort };
 
 const targetFor = (p: Prescription) => (p.exercise.perSide ? p.amount * 2 : p.amount);
 
@@ -38,6 +41,7 @@ function firstOpenCursor(day: ProgramDay, session: Session): Cursor | null {
 
 export function SessionRunner({ dayId }: { dayId: string }) {
   const day = findDay(dayId)!;
+  const plan = PLANS[day.planId];
   const router = useRouter();
   const profile = useProfile();
   const sessions = useSessions();
@@ -61,7 +65,7 @@ export function SessionRunner({ dayId }: { dayId: string }) {
     }
   };
 
-  const finishSet = async (weightKg?: number) => {
+  const finishSet = async (result: SetResult) => {
     if (!session) return;
     const p = day.items[cursor.item];
     await logSet(session.id, {
@@ -69,13 +73,13 @@ export function SessionRunner({ dayId }: { dayId: string }) {
       setIndex: cursor.set,
       target: targetFor(p),
       ...stats.current,
-      weightKg,
+      ...result,
       at: Date.now(),
     });
     const next = nextCursor(day, cursor);
     if (!next) {
       await finishSession(session.id);
-      speak("Session complete. Great work.", { interrupt: true });
+      speak(plan.voice.sessionDone, { interrupt: true });
       setStage("summary");
       return;
     }
@@ -100,19 +104,14 @@ export function SessionRunner({ dayId }: { dayId: string }) {
   if (profile === undefined || sessions === undefined) return <div className="min-h-dvh bg-stage" />;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-stage text-stage-foreground">
-      {stage === "overview" && (
-        <Overview
-          day={day}
-          sessions={sessions}
-          onStart={start}
-        />
-      )}
+    <div data-plan={day.planId} className="flex min-h-dvh flex-col bg-stage text-stage-foreground">
+      {stage === "overview" && <Overview day={day} sessions={sessions} onStart={start} />}
       {stage === "set" && session && (
         <SetScreen
           key={`${cursor.item}-${cursor.set}`}
           day={day}
           cursor={cursor}
+          sessionId={session.id}
           model={profile?.model ?? "lite"}
           onStats={onStats}
           onFinish={finishSet}
@@ -139,12 +138,16 @@ export function SessionRunner({ dayId }: { dayId: string }) {
 // ─── Overview ───────────────────────────────────────────────────────────────
 
 function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Session[]; onStart: () => void }) {
+  const plan = PLANS[day.planId];
   const active = sessions.find((s) => s.dayId === day.id && s.status === "active");
   const done = sessions.find((s) => s.dayId === day.id && s.status === "done");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-10">
-      <Link href="/" className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-stage-muted hover:text-stage-foreground">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-stage-muted hover:text-stage-foreground"
+      >
         <ArrowLeft className="size-4" /> Today
       </Link>
       <header>
@@ -153,6 +156,7 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
           Week {day.week} · {day.phase.name} · about {estimateMinutes(day)} min
         </p>
         <h1 className="font-scoreboard mt-3 text-[clamp(3.5rem,14vw,5.5rem)] font-extrabold uppercase">{day.title}</h1>
+        <p className="mt-2 text-stage-muted">{day.focus}</p>
         {done && !active && (
           <p className="mt-3 text-stage-muted">
             You finished this session on {new Date(done.finishedAt ?? done.startedAt).toLocaleDateString()}. You can
@@ -161,17 +165,25 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
         )}
       </header>
 
+      <p className="rounded-2xl border border-stage-accent/40 bg-stage-accent/10 p-4 font-semibold">
+        {plan.sessionTip}
+      </p>
+
       <section aria-labelledby="warm">
-        <h2 id="warm" className="text-sm font-semibold text-stage-muted">Warm up first, about 5 min</h2>
+        <h2 id="warm" className="text-sm font-semibold text-stage-muted">
+          Warm up first, about 5 min
+        </h2>
         <ul className="mt-2 flex flex-col gap-1">
-          {PLANS[day.planId].warmUp.map((w) => (
+          {plan.warmUp.map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>
       </section>
 
       <section aria-labelledby="moves">
-        <h2 id="moves" className="text-sm font-semibold text-stage-muted">Moves</h2>
+        <h2 id="moves" className="text-sm font-semibold text-stage-muted">
+          Moves
+        </h2>
         <p className="mt-1 text-sm text-stage-muted">Tap a move to see how to do it.</p>
         <ol className="mt-2 divide-y divide-white/10 border-y border-white/10">
           {day.items.map((p) => (
@@ -190,7 +202,7 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
       <button
         type="button"
         onClick={onStart}
-        className="press mt-auto flex h-14 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground hover:brightness-110"
+        className="press mt-auto flex h-14 items-center justify-center gap-2 rounded-full bg-stage-accent text-lg font-semibold text-stage hover:brightness-110"
       >
         {active ? "Resume session" : "I'm warmed up, start"} <ArrowRight className="size-5" />
       </button>
@@ -203,6 +215,7 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
 function SetScreen({
   day,
   cursor,
+  sessionId,
   model,
   onStats,
   onFinish,
@@ -211,20 +224,24 @@ function SetScreen({
 }: {
   day: ProgramDay;
   cursor: Cursor;
+  sessionId: string;
   model: "lite" | "full";
   onStats: (s: CoachStats) => void;
-  onFinish: (weightKg?: number) => void;
+  onFinish: (result: SetResult) => void;
   onSkip: () => void;
   onExit: () => void;
 }) {
+  const plan = PLANS[day.planId];
   const p = day.items[cursor.item];
   const e = p.exercise;
   const target = targetFor(p);
+  const strength = plan.style === "strength";
+  const rateEffort = strength && e.unit === "reps";
+  const usesWeights = e.equipment === "dumbbells";
   const [howTo, setHowTo] = useState(false);
   const [busy, setBusy] = useState(false);
-  const usesWeights = e.equipment === "dumbbells";
   const [weight, setWeight] = useState<number | null>(null);
-  const [lastKg, setLastKg] = useState<number | undefined>();
+  const [advice, setAdvice] = useState<Suggestion | null>(null);
   // Survives the coach panel unmounting while "How to" is open.
   const latest = useRef<CoachStats | undefined>(undefined);
   const [resumeFrom, setResumeFrom] = useState<CoachStats | undefined>();
@@ -237,19 +254,47 @@ function SetScreen({
   );
 
   useEffect(() => {
-    if (!usesWeights) return;
-    lastWeight(e.id).then((kg) => {
-      setLastKg(kg);
-      setWeight((w) => w ?? kg ?? 5);
+    if (!usesWeights && !p.range) return;
+    exerciseHistory(e.id, sessionId).then(({ previous, thisSession }) => {
+      const suggestion = p.range ? suggestNext(previous, p.range, usesWeights) : null;
+      setAdvice(suggestion);
+      if (usesWeights) {
+        // Later sets reuse this session's weight; the first set starts from the suggestion.
+        const sameSession = thisSession.at(-1)?.weightKg;
+        const lastAny = previous.at(-1)?.weightKg;
+        setWeight((w) => w ?? sameSession ?? suggestion?.kg ?? lastAny ?? 5);
+      }
     });
-  }, [e.id, usesWeights]);
+  }, [e.id, sessionId, usesWeights, p.range]);
 
   const totalSets = day.items.reduce((n, i) => n + i.sets, 0);
   const setsBefore = day.items.slice(0, cursor.item).reduce((n, i) => n + i.sets, 0) + cursor.set;
 
   useEffect(() => {
-    speak(`${e.name}. Set ${cursor.set + 1} of ${p.sets}.`, { interrupt: true });
-  }, [e.name, cursor.set, p.sets]);
+    const what = p.finisher
+      ? "Finisher. Everything you've got."
+      : p.range
+        ? `Set ${cursor.set + 1} of ${p.sets}. ${p.range[0]} to ${p.range[1]} reps.`
+        : `Set ${cursor.set + 1} of ${p.sets}.`;
+    speak(`${e.name}. ${what}`, { interrupt: true });
+  }, [e.name, cursor.set, p.sets, p.range, p.finisher]);
+
+  const amountText = (n: number | string) =>
+    e.perSide ? `${n}${e.unit === "seconds" ? "s" : ""} each side` : `${n}${e.unit === "seconds" ? " seconds" : " reps"}`;
+  const subtitle = p.finisher
+    ? `One all-out set · aim for ${amountText(p.amount)}`
+    : `Set ${cursor.set + 1} of ${p.sets} · ${amountText(p.range ? `${p.range[0]}–${p.range[1]}` : p.amount)}`;
+
+  // Strength style: at the bottom of the range, push for the top.
+  const milestone =
+    p.range && !e.perSide && e.unit === "reps"
+      ? { at: p.range[0], text: `That's ${p.range[0]}. Push for ${p.range[1]}.` }
+      : undefined;
+
+  const finish = async (result: SetResult) => {
+    setBusy(true);
+    await onFinish({ weightKg: usesWeights && weight !== null ? weight : undefined, ...result });
+  };
 
   return (
     <div className="flex h-dvh flex-col">
@@ -258,13 +303,14 @@ function SetScreen({
       </div>
       <header className="flex items-start gap-3 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3">
         <div className="flex-1">
+          {p.finisher && (
+            <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-stage-accent px-2.5 py-0.5 text-xs font-bold text-stage uppercase">
+              <Flame className="size-3.5" /> Finisher
+            </span>
+          )}
           <h1 className="font-scoreboard text-4xl font-extrabold uppercase">{e.name}</h1>
-          <p className="mt-1 text-sm text-stage-muted">
-            Set {cursor.set + 1} of {p.sets} ·{" "}
-            {e.perSide
-              ? `${p.amount}${e.unit === "seconds" ? "s" : ""} each side`
-              : `${p.amount}${e.unit === "seconds" ? " seconds" : " reps"}`}
-          </p>
+          <p className="mt-1 text-sm text-stage-muted">{subtitle}</p>
+          {advice && !usesWeights && <p className="mt-1 text-sm">{advice.message}</p>}
         </div>
         <button
           type="button"
@@ -292,7 +338,9 @@ function SetScreen({
           <MoveAnimation id={e.id} className="mb-5 h-56 rounded-2xl bg-white/5 p-4" />
           <ol className="flex list-decimal flex-col gap-2 pl-5 marker:font-mono marker:text-stage-muted">
             {e.steps.map((s) => (
-              <li key={s} className="max-w-[60ch] pl-1">{s}</li>
+              <li key={s} className="max-w-[60ch] pl-1">
+                {s}
+              </li>
             ))}
           </ol>
           <p className="mt-5 text-sm font-semibold text-stage-muted">Cues</p>
@@ -311,38 +359,76 @@ function SetScreen({
           model={model}
           cameraDefault
           initial={resumeFrom}
+          doneLine={plan.voice.setDone}
+          milestone={milestone}
           onStats={reportStats}
         />
       )}
 
-      {usesWeights && weight !== null && (
-        <WeightPicker kg={weight} lastKg={lastKg} onChange={setWeight} />
+      {usesWeights && weight !== null && <WeightPicker kg={weight} advice={advice} onChange={setWeight} />}
+
+      {rateEffort && !p.finisher ? (
+        <footer className="flex flex-col gap-2 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-semibold">Finish set: how hard was it?</p>
+            <button
+              type="button"
+              onClick={onSkip}
+              className="press inline-flex items-center gap-1 text-sm text-stage-muted hover:text-stage-foreground"
+            >
+              <SkipForward className="size-4" /> Skip move
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(Object.keys(EFFORT_LABEL) as Effort[]).map((effort) => (
+              <button
+                key={effort}
+                type="button"
+                disabled={busy}
+                onClick={() => finish({ effort })}
+                className={cn(
+                  "press flex h-16 flex-col items-center justify-center rounded-2xl font-semibold disabled:opacity-60",
+                  effort === "hard" ? "bg-stage-accent text-stage" : "bg-white/10 hover:bg-white/15",
+                )}
+              >
+                <span className="text-lg leading-tight">{EFFORT_LABEL[effort].title}</span>
+                <span className="text-xs font-medium opacity-75">{EFFORT_LABEL[effort].hint}</span>
+              </button>
+            ))}
+          </div>
+        </footer>
+      ) : (
+        <footer className="flex items-center gap-3 px-4 pt-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="press inline-flex h-14 items-center gap-1.5 rounded-full px-4 text-sm text-stage-muted hover:text-stage-foreground"
+          >
+            <SkipForward className="size-4" /> Skip move
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => finish({})}
+            className="press flex h-14 flex-1 items-center justify-center rounded-full bg-stage-accent text-lg font-semibold text-stage disabled:opacity-60"
+          >
+            {p.finisher ? "Done, I'm spent" : "Finish set"}
+          </button>
+        </footer>
       )}
-      <footer className="flex items-center gap-3 px-4 pt-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="press inline-flex h-14 items-center gap-1.5 rounded-full px-4 text-sm text-stage-muted hover:text-stage-foreground"
-        >
-          <SkipForward className="size-4" /> Skip move
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            await onFinish(usesWeights && weight !== null ? weight : undefined);
-          }}
-          className="press flex h-14 flex-1 items-center justify-center rounded-full bg-stage-foreground text-lg font-semibold text-stage disabled:opacity-60"
-        >
-          Finish set
-        </button>
-      </footer>
     </div>
   );
 }
 
-function WeightPicker({ kg, lastKg, onChange }: { kg: number; lastKg?: number; onChange: (kg: number) => void }) {
+function WeightPicker({
+  kg,
+  advice,
+  onChange,
+}: {
+  kg: number;
+  advice: Suggestion | null;
+  onChange: (kg: number) => void;
+}) {
   const step = kg < 10 ? 0.5 : 1;
   const set = (v: number) => onChange(Math.max(0, Math.round(v * 2) / 2));
   return (
@@ -350,7 +436,7 @@ function WeightPicker({ kg, lastKg, onChange }: { kg: number; lastKg?: number; o
       <div className="flex-1">
         <p className="text-sm font-semibold">Dumbbell weight (each)</p>
         <p className="text-xs text-stage-muted">
-          {lastKg === undefined ? "Pick a weight you can lift for every rep with 1–2 to spare." : `Last time: ${lastKg} kg`}
+          {advice?.message ?? "Pick a weight you can lift for every rep with 1–2 to spare."}
         </p>
       </div>
       <button
@@ -370,7 +456,7 @@ function WeightPicker({ kg, lastKg, onChange }: { kg: number; lastKg?: number; o
           step={0.5}
           value={kg}
           onChange={(ev) => set(Number(ev.target.value) || 0)}
-          className="w-16 rounded-lg bg-white/10 px-2 py-1.5 text-center font-mono text-lg outline-none focus:ring-2 focus:ring-primary"
+          className="w-16 rounded-lg bg-white/10 px-2 py-1.5 text-center font-mono text-lg outline-none focus:ring-2 focus:ring-stage-accent"
         />
         <span className="text-sm text-stage-muted">kg</span>
       </label>
@@ -402,14 +488,14 @@ function RestScreen({ day, cursor, onDone }: { day: ProgramDay; cursor: Cursor; 
     const id = setInterval(() => {
       const s = Math.ceil((endAt.current - Date.now()) / 1000);
       setLeft(s);
-      if (s === 10) speak(`Ten seconds. Next, ${p.exercise.name}.`);
+      if (s === 10) speak(p.finisher ? "Ten seconds. Finisher next. Leave nothing." : `Ten seconds. Next, ${p.exercise.name}.`);
       if (s <= 0) {
         clearInterval(id);
         doneRef.current();
       }
     }, 250);
     return () => clearInterval(id);
-  }, [p.restSec, p.exercise.name]);
+  }, [p.restSec, p.exercise.name, p.finisher]);
 
   const setup = p.exercise.tracking.kind === "manual" ? null : p.exercise.tracking.setup;
 
@@ -420,7 +506,9 @@ function RestScreen({ day, cursor, onDone }: { day: ProgramDay; cursor: Cursor; 
         <span className="font-scoreboard text-[clamp(8rem,40vw,13rem)] font-extrabold" aria-live="off">
           {formatSeconds(Math.max(0, left))}
         </span>
-        <p className="mt-6 text-sm font-semibold text-stage-muted">Up next · set {cursor.set + 1} of {p.sets}</p>
+        <p className="mt-6 text-sm font-semibold text-stage-muted">
+          {p.finisher ? "Up next · finisher" : `Up next · set ${cursor.set + 1} of ${p.sets}`}
+        </p>
         <p className="font-scoreboard mt-1 text-4xl font-bold uppercase">{p.exercise.name}</p>
         <MoveAnimation id={p.exercise.id} className="mt-4 h-40 max-w-sm rounded-2xl bg-white/5 p-3" />
         {setup && cursor.set === 0 && <p className="mt-3 max-w-[52ch] text-stage-muted">{setup}</p>}
@@ -450,77 +538,143 @@ function RestScreen({ day, cursor, onDone }: { day: ProgramDay; cursor: Cursor; 
 
 // ─── Summary ────────────────────────────────────────────────────────────────
 
+type Totals = {
+  reps: number;
+  seconds: number;
+  tracked: number;
+  good: number;
+  minutes: number;
+  topCue?: [string, number];
+  /** Strength: Σ kg × reps over weighted sets. */
+  volumeKg: number;
+  maxSets: number;
+  bests: { name: string; kg: number }[];
+  /** Sculpt: reps from glute and leg moves, and the finisher result. */
+  lowerReps: number;
+  finisher?: { name: string; done: number; seconds: boolean };
+};
+
+function computeTotals(day: ProgramDay, session: Session, earlier: Session[]): Totals {
+  const t: Totals = { reps: 0, seconds: 0, tracked: 0, good: 0, minutes: 0, volumeKg: 0, maxSets: 0, bests: [], lowerReps: 0 };
+  const cues: Record<string, number> = {};
+  const heaviest = new Map<string, number>();
+
+  for (const s of session.sets) {
+    const item = day.items.find((i) => i.exercise.id === s.exerciseId);
+    const e = item?.exercise;
+    if (e?.unit === "seconds") t.seconds += s.done;
+    else t.reps += s.done;
+    if (s.tracked && e?.unit === "reps") {
+      t.tracked += s.done;
+      t.good += s.goodReps;
+    }
+    if (e?.unit === "reps" && e.areas.some((a) => a === "glutes" || a === "legs")) t.lowerReps += s.done;
+    if (s.weightKg !== undefined) {
+      t.volumeKg += s.weightKg * s.done;
+      heaviest.set(s.exerciseId, Math.max(heaviest.get(s.exerciseId) ?? 0, s.weightKg));
+    }
+    if (s.effort === "max") t.maxSets += 1;
+    if (item?.finisher && e) t.finisher = { name: e.name, done: s.done, seconds: e.unit === "seconds" };
+    for (const [k, v] of Object.entries(s.cues)) cues[k] = (cues[k] ?? 0) + v;
+  }
+
+  for (const [id, kg] of heaviest) {
+    const before = earlier.flatMap((s) => s.sets.filter((x) => x.exerciseId === id && x.weightKg !== undefined));
+    const prev = Math.max(0, ...before.map((x) => x.weightKg!));
+    if (before.length > 0 && kg > prev) t.bests.push({ name: findExercise(id)?.name ?? id, kg });
+  }
+
+  t.topCue = Object.entries(cues).sort((a, b) => b[1] - a[1])[0];
+  t.minutes = Math.round(((session.finishedAt ?? session.startedAt) - session.startedAt) / 60000);
+  return t;
+}
+
 function Summary({ day, sessionId }: { day: ProgramDay; sessionId: string }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const plan = PLANS[day.planId];
+  const [data, setData] = useState<{ session: Session; earlier: Session[] } | null>(null);
   useEffect(() => {
-    db.sessions.get(sessionId).then((s) => setSession(s ?? null));
+    db.sessions.toArray().then((all) => {
+      const session = all.find((s) => s.id === sessionId);
+      if (session) setData({ session, earlier: all.filter((s) => s.id !== sessionId && s.startedAt < session.startedAt) });
+    });
   }, [sessionId]);
 
-  const totals = useMemo(() => {
-    if (!session) return null;
-    let reps = 0;
-    let tracked = 0;
-    let good = 0;
-    let seconds = 0;
-    const cues: Record<string, number> = {};
-    for (const s of session.sets) {
-      const e = day.items.find((i) => i.exercise.id === s.exerciseId)?.exercise;
-      if (e?.unit === "seconds") seconds += s.done;
-      else reps += s.done;
-      if (s.tracked && e?.unit === "reps") {
-        tracked += s.done;
-        good += s.goodReps;
-      }
-      for (const [k, v] of Object.entries(s.cues)) cues[k] = (cues[k] ?? 0) + v;
-    }
-    const topCue = Object.entries(cues).sort((a, b) => b[1] - a[1])[0];
-    const minutes = Math.round(((session.finishedAt ?? session.startedAt) - session.startedAt) / 60000);
-    return { reps, seconds, tracked, good, topCue, minutes };
-  }, [session, day.items]);
+  const t = useMemo(() => (data ? computeTotals(day, data.session, data.earlier) : null), [data, day]);
+  if (!t) return null;
+  const clean = t.tracked ? `${Math.round((t.good / t.tracked) * 100)}%` : "–";
 
-  if (!totals) return null;
+  const tiles =
+    plan.style === "strength"
+      ? [
+          { label: "Weight moved", value: t.volumeKg ? `${Math.round(t.volumeKg).toLocaleString()} kg` : "–" },
+          { label: "Reps", value: String(t.reps) },
+          { label: "Sets to max effort", value: String(t.maxSets) },
+          { label: "Duration", value: `${t.minutes} min` },
+        ]
+      : [
+          { label: "Glute & thigh reps", value: String(t.lowerReps) },
+          { label: "Time under hold", value: formatSeconds(t.seconds) },
+          { label: "Clean camera reps", value: clean },
+          { label: "Duration", value: `${t.minutes} min` },
+        ];
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1rem)]">
       <h1 className="font-scoreboard text-[clamp(3.5rem,14vw,5.5rem)] font-extrabold uppercase">Session done</h1>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-y border-white/10 py-6">
-        <div>
-          <dt className="text-sm text-stage-muted">Reps</dt>
-          <dd className="font-scoreboard text-5xl font-bold">{totals.reps}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-stage-muted">Time under hold</dt>
-          <dd className="font-scoreboard text-5xl font-bold">{formatSeconds(totals.seconds)}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-stage-muted">Clean camera reps</dt>
-          <dd className="font-scoreboard text-5xl font-bold">
-            {totals.tracked ? `${Math.round((totals.good / totals.tracked) * 100)}%` : "–"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-stage-muted">Duration</dt>
-          <dd className="font-scoreboard text-5xl font-bold">{totals.minutes} min</dd>
-        </div>
+        {tiles.map((tile) => (
+          <div key={tile.label}>
+            <dt className="text-sm text-stage-muted">{tile.label}</dt>
+            <dd className="font-scoreboard text-5xl font-bold">{tile.value}</dd>
+          </div>
+        ))}
       </dl>
-      {totals.topCue && (
+
+      {plan.style === "strength" && t.bests.length > 0 && (
+        <section>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-stage-muted">
+            <Trophy className="size-4 text-stage-accent" /> New heaviest weights
+          </h2>
+          <ul className="mt-2 flex flex-col gap-1">
+            {t.bests.map((b) => (
+              <li key={b.name} className="font-semibold">
+                {b.name}: {b.kg} kg
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {plan.style === "sculpt" && t.finisher && (
+        <section>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-stage-muted">
+            <Flame className="size-4 text-stage-accent" /> Finisher
+          </h2>
+          <p className="mt-1 text-xl font-semibold">
+            {t.finisher.name}: {t.finisher.seconds ? formatSeconds(t.finisher.done) : `${t.finisher.done} reps`}
+          </p>
+          <p className="mt-1 text-sm text-stage-muted">Beat this number the next time this finisher comes up.</p>
+        </section>
+      )}
+
+      {t.topCue && (
         <section>
           <h2 className="text-sm font-semibold text-stage-muted">Work on next time</h2>
-          <p className="mt-1 text-xl font-semibold">“{totals.topCue[0]}”</p>
-          <p className="mt-1 text-sm text-stage-muted">The camera flagged this on {totals.topCue[1]} reps.</p>
+          <p className="mt-1 text-xl font-semibold">“{t.topCue[0]}”</p>
+          <p className="mt-1 text-sm text-stage-muted">The camera flagged this on {t.topCue[1]} reps.</p>
         </section>
       )}
       <section>
         <h2 className="text-sm font-semibold text-stage-muted">Cool down</h2>
         <ul className="mt-2 flex flex-col gap-1">
-          {PLANS[day.planId].coolDown.map((c) => (
+          {plan.coolDown.map((c) => (
             <li key={c}>{c}</li>
           ))}
         </ul>
       </section>
       <Link
         href="/"
-        className="press mt-auto flex h-14 items-center justify-center rounded-full bg-stage-foreground text-lg font-semibold text-stage"
+        className="press mt-auto flex h-14 items-center justify-center rounded-full bg-stage-accent text-lg font-semibold text-stage"
       >
         Back to today
       </Link>

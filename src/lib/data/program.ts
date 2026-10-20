@@ -26,14 +26,34 @@ export type Phase = {
   summary: string;
 };
 
-type Slot = { id: string; sets: number; amount: number };
+type Slot = {
+  id: string;
+  sets: number;
+  amount: number;
+  /** Strength style: a rep range instead of a fixed target (double progression). */
+  range?: [number, number];
+  /** Sculpt style: one all-out set to end the session. */
+  finisher?: boolean;
+};
 type DayTemplate = { key: DayKey; title: string; focus: string; slots: Slot[] };
+
+/**
+ * How a plan feels in the session, not just what it contains.
+ * - sculpt: fixed reps, control and squeeze cues, an all-out finisher.
+ * - strength: rep ranges, an effort rating after each set, weight suggestions.
+ */
+export type TrainingStyle = "sculpt" | "strength";
 
 export type Plan = {
   id: PlanId;
   name: string;
+  style: TrainingStyle;
   /** One line under the name, in the user's terms. */
   summary: string;
+  /** The one thing to remember during every session. */
+  sessionTip: string;
+  /** Spoken at the end of a set and a session. */
+  voice: { setDone: string; sessionDone: string };
   equipment: string;
   /** The areas this plan trains, in the order its filters should show. */
   areas: Area[];
@@ -42,12 +62,23 @@ export type Plan = {
   restDayNote: string;
   phases: Phase[];
   templates: Record<PhaseId, DayTemplate[]>;
+  /** Sculpt style: an all-out set appended to the end of a day. */
+  finishers?: Record<PhaseId, Partial<Record<DayKey, Slot>>>;
   restSec: Record<PhaseId, number>;
   warmUp: string[];
   coolDown: string[];
 };
 
 const s = (id: string, sets: number, amount: number): Slot => ({ id, sets, amount });
+const r = (id: string, sets: number, lo: number, hi: number): Slot => ({ id, sets, amount: hi, range: [lo, hi] });
+const fin = (id: string, amount: number): Slot => ({ id, sets: 1, amount, finisher: true });
+
+// Each finisher avoids moves already in that day, so set logs stay unambiguous.
+const SHAPE_FINISHERS: Record<PhaseId, Partial<Record<DayKey, Slot>>> = {
+  foundation: { a: fin("frog-pump", 20), b: fin("knee-push-up", 10), c: fin("glute-bridge", 25) },
+  build: { a: fin("frog-pump", 30), b: fin("incline-push-up", 15), c: fin("glute-bridge-hold", 45) },
+  sculpt: { a: fin("frog-pump", 40), b: fin("knee-push-up", 15), c: fin("frog-pump", 40) },
+};
 
 const SHAPE_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
   foundation: [
@@ -218,6 +249,9 @@ const SHAPE_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
   ],
 };
 
+// Rep ranges: lighter and higher while learning, then heavier compounds in the
+// later phases. Isolation moves stay in higher ranges. Progress inside a range
+// is by weight (see lib/progression.ts), so ranges don't creep up weekly.
 const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
   foundation: [
     {
@@ -225,11 +259,11 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Push",
       focus: "Chest, shoulders and triceps",
       slots: [
-        s("push-up", 3, 8),
-        s("db-floor-press", 3, 10),
-        s("pike-push-up", 3, 6),
-        s("db-lateral-raise", 3, 12),
-        s("chair-dip", 3, 8),
+        r("push-up", 3, 6, 12),
+        r("db-floor-press", 3, 10, 15),
+        r("pike-push-up", 3, 5, 8),
+        r("db-lateral-raise", 3, 12, 15),
+        r("chair-dip", 3, 8, 12),
         s("plank", 3, 30),
       ],
     },
@@ -238,11 +272,11 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Pull",
       focus: "Lats, back and biceps",
       slots: [
-        s("inverted-row", 3, 8),
-        s("db-bent-over-row", 3, 10),
-        s("db-pullover", 3, 10),
-        s("db-rdl", 3, 10),
-        s("db-curl", 3, 10),
+        r("inverted-row", 3, 6, 10),
+        r("db-bent-over-row", 3, 10, 15),
+        r("db-pullover", 3, 10, 15),
+        r("db-rdl", 3, 10, 15),
+        r("db-curl", 3, 10, 15),
         s("dead-bug", 3, 8),
       ],
     },
@@ -251,12 +285,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Legs",
       focus: "Quads, hamstrings, glutes and calves",
       slots: [
-        s("goblet-squat", 3, 10),
-        s("reverse-lunge", 3, 8),
-        s("db-rdl", 3, 10),
-        s("glute-bridge", 3, 12),
-        s("calf-raise", 3, 15),
-        s("lying-leg-raise", 3, 10),
+        r("goblet-squat", 3, 10, 15),
+        r("reverse-lunge", 3, 8, 12),
+        r("db-rdl", 3, 10, 15),
+        r("glute-bridge", 3, 12, 20),
+        r("calf-raise", 3, 15, 20),
+        r("lying-leg-raise", 3, 8, 12),
       ],
     },
     {
@@ -264,12 +298,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Arms & shoulders",
       focus: "Biceps, triceps and delts",
       slots: [
-        s("db-shoulder-press", 3, 10),
-        s("db-curl", 3, 10),
-        s("db-overhead-extension", 3, 10),
-        s("hammer-curl", 3, 10),
-        s("diamond-push-up", 3, 6),
-        s("rear-delt-fly", 3, 12),
+        r("db-shoulder-press", 3, 10, 15),
+        r("db-curl", 3, 10, 15),
+        r("db-overhead-extension", 3, 10, 15),
+        r("hammer-curl", 3, 10, 15),
+        r("diamond-push-up", 3, 5, 10),
+        r("rear-delt-fly", 3, 12, 20),
         s("side-plank", 2, 20),
       ],
     },
@@ -280,12 +314,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Push",
       focus: "More chest volume",
       slots: [
-        s("decline-push-up", 3, 10),
-        s("db-floor-press", 4, 10),
-        s("pike-push-up", 3, 8),
-        s("db-fly", 3, 12),
-        s("db-lateral-raise", 3, 12),
-        s("db-overhead-extension", 3, 10),
+        r("decline-push-up", 3, 8, 12),
+        r("db-floor-press", 4, 8, 12),
+        r("pike-push-up", 3, 6, 10),
+        r("db-fly", 3, 10, 15),
+        r("db-lateral-raise", 3, 12, 20),
+        r("db-overhead-extension", 3, 10, 15),
         s("plank", 3, 40),
       ],
     },
@@ -294,12 +328,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Pull",
       focus: "Pull-ups start here",
       slots: [
-        s("pull-up", 4, 5),
-        s("db-bent-over-row", 4, 10),
-        s("inverted-row", 3, 10),
-        s("db-pullover", 3, 12),
-        s("db-rdl", 3, 10),
-        s("hammer-curl", 3, 10),
+        r("pull-up", 4, 3, 8),
+        r("db-bent-over-row", 4, 8, 12),
+        r("inverted-row", 3, 8, 12),
+        r("db-pullover", 3, 10, 15),
+        r("db-rdl", 3, 8, 12),
+        r("hammer-curl", 3, 8, 12),
         s("dead-bug", 3, 10),
       ],
     },
@@ -308,12 +342,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Legs",
       focus: "Single-leg strength",
       slots: [
-        s("goblet-squat", 4, 12),
-        s("bulgarian-split-squat", 3, 8),
-        s("db-rdl", 4, 10),
+        r("goblet-squat", 4, 8, 12),
+        r("bulgarian-split-squat", 3, 8, 12),
+        r("db-rdl", 4, 8, 12),
         s("wall-sit", 3, 45),
-        s("calf-raise", 3, 20),
-        s("lying-leg-raise", 3, 12),
+        r("calf-raise", 3, 15, 20),
+        r("lying-leg-raise", 3, 10, 15),
       ],
     },
     {
@@ -321,12 +355,12 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
       title: "Arms & shoulders",
       focus: "Arm size",
       slots: [
-        s("db-shoulder-press", 4, 10),
-        s("db-lateral-raise", 3, 15),
-        s("db-curl", 4, 10),
-        s("diamond-push-up", 3, 8),
-        s("chair-dip", 3, 12),
-        s("rear-delt-fly", 3, 12),
+        r("db-shoulder-press", 4, 8, 12),
+        r("db-lateral-raise", 3, 12, 20),
+        r("db-curl", 4, 8, 12),
+        r("diamond-push-up", 3, 8, 12),
+        r("chair-dip", 3, 10, 15),
+        r("rear-delt-fly", 3, 12, 20),
         s("bicycle-crunch", 3, 12),
       ],
     },
@@ -335,55 +369,55 @@ const PPL_TEMPLATES: Record<PhaseId, DayTemplate[]> = {
     {
       key: "a",
       title: "Push",
-      focus: "Heavier presses and high-rep finishers",
+      focus: "Heavier presses and a burnout",
       slots: [
-        s("db-floor-press", 4, 12),
-        s("decline-push-up", 4, 12),
-        s("pike-push-up", 3, 10),
-        s("db-fly", 3, 15),
-        s("db-lateral-raise", 4, 15),
-        s("push-up", 2, 15),
+        r("db-floor-press", 4, 6, 10),
+        r("decline-push-up", 4, 10, 15),
+        r("pike-push-up", 3, 8, 12),
+        r("db-fly", 3, 12, 15),
+        r("db-lateral-raise", 4, 12, 20),
+        r("push-up", 2, 15, 25),
         s("plank", 3, 50),
       ],
     },
     {
       key: "b",
       title: "Pull",
-      focus: "More pull-ups and rows",
+      focus: "More pull-ups and heavier rows",
       slots: [
-        s("pull-up", 5, 6),
-        s("db-bent-over-row", 4, 12),
-        s("inverted-row", 3, 12),
-        s("db-pullover", 3, 12),
-        s("db-rdl", 3, 12),
-        s("db-curl", 3, 12),
+        r("pull-up", 5, 4, 8),
+        r("db-bent-over-row", 4, 6, 10),
+        r("inverted-row", 3, 10, 15),
+        r("db-pullover", 3, 10, 15),
+        r("db-rdl", 3, 6, 10),
+        r("db-curl", 3, 8, 12),
         s("dead-bug", 3, 12),
       ],
     },
     {
       key: "c",
       title: "Legs",
-      focus: "Volume and single-leg work",
+      focus: "Heavy single-leg work",
       slots: [
-        s("bulgarian-split-squat", 4, 10),
-        s("goblet-squat", 4, 15),
-        s("db-rdl", 4, 12),
-        s("reverse-lunge", 3, 12),
-        s("calf-raise", 4, 20),
-        s("lying-leg-raise", 3, 15),
+        r("bulgarian-split-squat", 4, 6, 10),
+        r("goblet-squat", 4, 8, 12),
+        r("db-rdl", 4, 6, 10),
+        r("reverse-lunge", 3, 10, 12),
+        r("calf-raise", 4, 15, 20),
+        r("lying-leg-raise", 3, 12, 15),
       ],
     },
     {
       key: "d",
       title: "Arms & shoulders",
-      focus: "Supersets for arm pump",
+      focus: "Heavier presses, high-rep arms",
       slots: [
-        s("db-shoulder-press", 4, 12),
-        s("hammer-curl", 4, 12),
-        s("db-overhead-extension", 4, 12),
-        s("db-curl", 3, 12),
-        s("diamond-push-up", 3, 12),
-        s("rear-delt-fly", 3, 15),
+        r("db-shoulder-press", 4, 6, 10),
+        r("hammer-curl", 4, 8, 12),
+        r("db-overhead-extension", 4, 8, 12),
+        r("db-curl", 3, 10, 12),
+        r("diamond-push-up", 3, 10, 15),
+        r("rear-delt-fly", 3, 15, 20),
         s("side-plank", 3, 30),
       ],
     },
@@ -400,6 +434,13 @@ export const PLANS: Record<PlanId, Plan> = {
   shape: {
     id: "shape",
     name: "Glutes, thighs, chest & waist",
+    style: "sculpt",
+    sessionTip: "Slow on the way down, squeeze hard at the top. Control beats speed.",
+    voice: {
+      setDone: "Set done. Shake it out.",
+      sessionDone: "Session complete. You earned that burn.",
+    },
+    finishers: SHAPE_FINISHERS,
     summary: "Shape-focused bodyweight plan: rounder glutes, toned thighs, a lifted chest and a stronger core.",
     equipment: "No equipment. A chair, a couch and a wall.",
     areas: ["glutes", "legs", "chest", "back", "core"],
@@ -432,6 +473,12 @@ export const PLANS: Record<PlanId, Plan> = {
   ppl: {
     id: "ppl",
     name: "Push / Pull / Legs",
+    style: "strength",
+    sessionTip: "Pick a weight you can lift for the whole rep range. End each set with 1–2 reps left in the tank.",
+    voice: {
+      setDone: "Set done. How hard was that?",
+      sessionDone: "Session done. Beat these numbers next time.",
+    },
     summary: "Muscle-building split: chest, back and lats, shoulders, biceps, triceps and legs.",
     equipment: "A pair of dumbbells. A pull-up bar from week 3, or a sturdy table for rows.",
     areas: ["chest", "back", "shoulders", "biceps", "triceps", "legs", "core"],
@@ -476,6 +523,10 @@ export type Prescription = {
   /** Reps (per side when exercise.perSide) or seconds. */
   amount: number;
   restSec: number;
+  /** Strength style: target rep range; `amount` is its top. */
+  range?: [number, number];
+  /** Sculpt style: the all-out set that ends the session. */
+  finisher?: boolean;
 };
 
 export type ProgramDay = {
@@ -505,6 +556,11 @@ export function phaseForWeek(plan: Plan, week: number): Phase {
   return phase;
 }
 
+function finisherFor(plan: Plan, phase: PhaseId, key: DayKey): Slot[] | undefined {
+  const slot = plan.finishers?.[phase][key];
+  return slot ? [slot] : undefined;
+}
+
 function buildProgram(plan: Plan): ProgramDay[] {
   const days: ProgramDay[] = [];
   for (let week = 1; week <= TOTAL_WEEKS; week++) {
@@ -520,13 +576,16 @@ function buildProgram(plan: Plan): ProgramDay[] {
         phase,
         title: t.title,
         focus: t.focus,
-        items: t.slots.map((slot) => {
+        items: [...t.slots, ...(finisherFor(plan, phase.id, t.key) ?? [])].map((slot) => {
           const exercise = getExercise(slot.id);
           const step = exercise.unit === "seconds" ? 5 : 2;
           return {
             exercise,
             sets: slot.sets,
-            amount: slot.amount + step * weekInPhase,
+            // Ranges progress by weight, not by adding reps every week.
+            amount: slot.range ? slot.amount : slot.amount + step * weekInPhase,
+            range: slot.range,
+            finisher: slot.finisher,
             restSec: plan.restSec[phase.id],
           };
         }),
@@ -558,6 +617,15 @@ export function nextDay(plan: PlanId, completedIds: Iterable<string>): ProgramDa
 /** Exercise ids used anywhere in a plan. */
 export function planExerciseIds(plan: PlanId): Set<string> {
   return new Set(PROGRAMS[plan].flatMap((d) => d.items.map((i) => i.exercise.id)));
+}
+
+/** "3×8–12", "3×12/side", "3×30s", or "All-out ×20" for a finisher. */
+export function targetLabel(p: Prescription): string {
+  const unit = p.exercise.unit === "seconds" ? "s" : "";
+  const side = p.exercise.perSide ? "/side" : "";
+  if (p.finisher) return `All-out ×${p.amount}${unit}${side}`;
+  const amount = p.range ? `${p.range[0]}–${p.range[1]}` : `${p.amount}`;
+  return `${p.sets}×${amount}${unit}${side}`;
 }
 
 export function estimateMinutes(day: ProgramDay): number {

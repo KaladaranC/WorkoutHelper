@@ -12,10 +12,11 @@ describe.each(Object.keys(PLANS) as PlanId[])("%s plan", (plan) => {
     expect(PROGRAMS[plan]).toHaveLength(TOTAL_WEEKS * DAYS_PER_WEEK);
   });
 
-  it("progresses inside a phase", () => {
-    const w3 = PROGRAMS[plan].find((d) => d.week === 3 && d.key === "a")!;
-    const w5 = PROGRAMS[plan].find((d) => d.week === 5 && d.key === "a")!;
-    expect(w5.items[0].amount).toBe(w3.items[0].amount + 4);
+  it("never repeats a move within a day (set logs are keyed by move)", () => {
+    for (const d of PROGRAMS[plan]) {
+      const ids = d.items.map((i) => i.exercise.id);
+      expect(new Set(ids).size, d.id).toBe(ids.length);
+    }
   });
 
   it("starts at the first day and moves on in order", () => {
@@ -51,6 +52,26 @@ describe("plans", () => {
       expect(daysHitting("ppl", week, "legs")).toBeGreaterThanOrEqual(2);
       expect(daysHitting("ppl", week, "core")).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it("shape: fixed reps climb inside a phase and glute days end on a finisher", () => {
+    const w3 = PROGRAMS.shape.find((d) => d.id === "w3-a")!;
+    const w5 = PROGRAMS.shape.find((d) => d.id === "w5-a")!;
+    expect(w5.items[0].amount).toBe(w3.items[0].amount + 4);
+    for (const d of PROGRAMS.shape.filter((d) => d.key === "a" || d.key === "c")) {
+      expect(d.items.at(-1)?.finisher, d.id).toBe(true);
+    }
+  });
+
+  it("ppl: every rep-based move uses a rep range that progresses by weight, not reps", () => {
+    for (const d of PROGRAMS.ppl) {
+      for (const i of d.items.filter((i) => i.exercise.unit === "reps" && !i.exercise.perSide)) {
+        expect(i.range, `${d.id} ${i.exercise.id}`).toBeDefined();
+      }
+    }
+    const w3 = PROGRAMS.ppl.find((d) => d.id === "ppl-w3-a")!;
+    const w5 = PROGRAMS.ppl.find((d) => d.id === "ppl-w5-a")!;
+    expect(w5.items[0].range).toEqual(w3.items[0].range);
   });
 
   it("only reference valid easier/harder exercises", () => {

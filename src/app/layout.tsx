@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Big_Shoulders, Figtree, JetBrains_Mono } from "next/font/google";
+import { PlanTheme } from "@/components/plan-theme";
 import "./globals.css";
 
 const shoulders = Big_Shoulders({
@@ -37,7 +38,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${shoulders.variable} ${figtree.variable} ${jetbrains.variable} antialiased`}>
-      <body className="min-h-dvh">{children}</body>
+      <body className="min-h-dvh">
+        <PlanTheme />
+        {children}
+      </body>
     </html>
   );
 }

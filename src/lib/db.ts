@@ -20,6 +20,8 @@ export const setLogSchema = z.object({
   tracked: z.boolean(),
   /** Dumbbell weight used, for moves that take weights. */
   weightKg: z.number().nonnegative().max(500).optional(),
+  /** Strength plan: how close to failure the set ended. */
+  effort: z.enum(["easy", "hard", "max"]).optional(),
   at: z.number(),
 });
 export type SetLog = z.infer<typeof setLogSchema>;
@@ -98,14 +100,20 @@ export async function getProfile(): Promise<Profile | null> {
   return parsed.success ? parsed.data : null;
 }
 
-/** The most recent weight logged for an exercise, to start the next set from. */
-export async function lastWeight(exerciseId: string): Promise<number | undefined> {
+/**
+ * An exercise's sets from the most recent earlier session that included it,
+ * plus the sets already done in the current session.
+ */
+export async function exerciseHistory(
+  exerciseId: string,
+  sessionId: string,
+): Promise<{ previous: SetLog[]; thisSession: SetLog[] }> {
   const sessions = await db.sessions.orderBy("startedAt").reverse().toArray();
-  for (const s of sessions) {
-    const sets = s.sets.filter((x) => x.exerciseId === exerciseId && x.weightKg !== undefined);
-    if (sets.length) return sets.sort((a, b) => b.at - a.at)[0].weightKg;
-  }
-  return undefined;
+  const pick = (s: Session) =>
+    s.sets.filter((x) => x.exerciseId === exerciseId).sort((a, b) => a.setIndex - b.setIndex);
+  const current = sessions.find((s) => s.id === sessionId);
+  const earlier = sessions.find((s) => s.id !== sessionId && pick(s).length > 0);
+  return { previous: earlier ? pick(earlier) : [], thisSession: current ? pick(current) : [] };
 }
 
 /** Resume the active session for a day, or start a new one. */
