@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# MediaPipe runtime is copied from node_modules at build time
+/public/mediapipe/
+
+# Local Claude Code config and skills
+.claude/
