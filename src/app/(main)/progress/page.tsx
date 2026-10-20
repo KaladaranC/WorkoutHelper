@@ -5,17 +5,37 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { findExercise } from "@/lib/data/exercises";
-import { findDay, PROGRAM } from "@/lib/data/program";
-import { db, measurementSchema, type Measurement, type Session } from "@/lib/db";
+import { findDay, PROGRAMS } from "@/lib/data/program";
+import { db, measurementSchema, type Gender, type Measurement, type Session } from "@/lib/db";
 import { useProfile, useSessions } from "@/lib/hooks";
 
-const FIELDS = [
-  { key: "bustCm", label: "Bust" },
-  { key: "underbustCm", label: "Underbust" },
-  { key: "waistCm", label: "Waist" },
-  { key: "hipsCm", label: "Hips" },
-  { key: "thighCm", label: "Thigh" },
-] as const;
+type FieldKey = "bustCm" | "underbustCm" | "chestCm" | "waistCm" | "hipsCm" | "armCm" | "thighCm";
+type Field = { key: FieldKey; label: string };
+
+// What's worth measuring depends on the body and the goal: bust and hips for
+// shape, chest and arms for muscle gain.
+const FIELDS_BY_GENDER: Record<Gender, Field[]> = {
+  female: [
+    { key: "bustCm", label: "Bust" },
+    { key: "underbustCm", label: "Underbust" },
+    { key: "waistCm", label: "Waist" },
+    { key: "hipsCm", label: "Hips" },
+    { key: "thighCm", label: "Thigh" },
+  ],
+  male: [
+    { key: "chestCm", label: "Chest" },
+    { key: "waistCm", label: "Waist" },
+    { key: "armCm", label: "Arm" },
+    { key: "thighCm", label: "Thigh" },
+  ],
+  unspecified: [
+    { key: "chestCm", label: "Chest" },
+    { key: "waistCm", label: "Waist" },
+    { key: "hipsCm", label: "Hips" },
+    { key: "armCm", label: "Arm" },
+    { key: "thighCm", label: "Thigh" },
+  ],
+};
 
 const IN_PER_CM = 1 / 2.54;
 
@@ -47,6 +67,9 @@ export default function ProgressPage() {
   const tracked = all.reduce((n, t) => n + t.tracked, 0);
   const good = all.reduce((n, t) => n + t.good, 0);
   const units = profile?.units ?? "cm";
+  const program = PROGRAMS[profile?.plan ?? "shape"];
+  const planDays = new Set(program.map((d) => d.id));
+  const doneInPlan = new Set(done.map((s) => s.dayId).filter((id) => planDays.has(id))).size;
 
   return (
     <div className="flex flex-col gap-12">
@@ -56,8 +79,8 @@ export default function ProgressPage() {
           <div>
             <dt className="text-sm text-muted">Sessions</dt>
             <dd className="font-scoreboard text-5xl font-bold">
-              {new Set(done.map((s) => s.dayId)).size}
-              <span className="text-2xl text-muted">/{PROGRAM.length}</span>
+              {doneInPlan}
+              <span className="text-2xl text-muted">/{program.length}</span>
             </dd>
           </div>
           <div>
@@ -72,7 +95,18 @@ export default function ProgressPage() {
         <p className="mt-3 text-sm text-muted">Clean form is the share of camera-counted reps with no form cue.</p>
       </header>
 
-      <Measurements measurements={measurements} units={units} />
+      <Strength sessions={done} />
+
+      <Measurements
+        measurements={measurements}
+        units={units}
+        fields={FIELDS_BY_GENDER[profile?.gender ?? "female"]}
+        intro={
+          profile?.gender === "male"
+            ? "Chest and arms grow while the waist holds steady or shrinks."
+            : "Glutes can grow while your waist shrinks."
+        }
+      />
 
       <section aria-labelledby="history">
         <h2 id="history" className="font-scoreboard text-4xl font-bold uppercase">History</h2>
@@ -109,8 +143,73 @@ export default function ProgressPage() {
   );
 }
 
-function Measurements({ measurements, units }: { measurements: Measurement[]; units: "cm" | "in" }) {
+/** First and latest dumbbell weight per move: the clearest sign of getting stronger. */
+function Strength({ sessions }: { sessions: Session[] }) {
+  const byExercise = new Map<string, { first: number; latest: number; firstAt: number; latestAt: number }>();
+  for (const s of sessions) {
+    for (const set of s.sets) {
+      if (set.weightKg === undefined) continue;
+      const cur = byExercise.get(set.exerciseId);
+      if (!cur) {
+        byExercise.set(set.exerciseId, { first: set.weightKg, latest: set.weightKg, firstAt: set.at, latestAt: set.at });
+        continue;
+      }
+      if (set.at < cur.firstAt) Object.assign(cur, { first: set.weightKg, firstAt: set.at });
+      if (set.at > cur.latestAt) Object.assign(cur, { latest: set.weightKg, latestAt: set.at });
+    }
+  }
+  if (byExercise.size === 0) return null;
+
+  return (
+    <section aria-labelledby="strength">
+      <h2 id="strength" className="font-scoreboard text-4xl font-bold uppercase">Strength</h2>
+      <p className="mt-2 max-w-[60ch] text-muted">Dumbbell weight per move, from your first logged set to your latest.</p>
+      <table className="mt-4 w-full text-sm tabular-nums">
+        <thead>
+          <tr className="border-b border-line text-left text-muted">
+            <th className="py-2 pr-3 font-semibold">Move</th>
+            <th className="py-2 pr-3 font-semibold">First</th>
+            <th className="py-2 pr-3 font-semibold">Latest</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...byExercise].map(([id, w]) => {
+            const delta = w.latest - w.first;
+            return (
+              <tr key={id} className="border-b border-line">
+                <td className="py-2.5 pr-3 font-semibold">{findExercise(id)?.name ?? id}</td>
+                <td className="py-2.5 pr-3 font-mono">{w.first} kg</td>
+                <td className="py-2.5 pr-3 font-mono">
+                  {w.latest} kg
+                  {delta !== 0 && (
+                    <span className={delta > 0 ? "ml-1.5 text-xs text-good" : "ml-1.5 text-xs text-muted"}>
+                      {delta > 0 ? "+" : "−"}
+                      {Math.abs(delta)}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function Measurements({
+  measurements,
+  units,
+  fields,
+  intro,
+}: {
+  measurements: Measurement[];
+  units: "cm" | "in";
+  fields: Field[];
+  intro: string;
+}) {
   const today = new Date().toISOString().slice(0, 10);
+  const showRatio = fields.some((f) => f.key === "hipsCm");
   const [values, setValues] = useState<Record<string, string>>({ date: today });
   const [error, setError] = useState<string | null>(null);
   const toDisplay = (cm?: number) => (cm === undefined ? undefined : units === "cm" ? cm : cm * IN_PER_CM);
@@ -122,7 +221,7 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
       <h2 id="measure" className="font-scoreboard text-4xl font-bold uppercase">Measurements</h2>
       <p className="mt-2 max-w-[60ch] text-muted">
         Measure every two weeks, in the morning, with the same tape in the same spots. Tape changes show progress the
-        scale misses. Glutes can grow while your waist shrinks.
+        scale misses. {intro}
       </p>
 
       <form
@@ -139,13 +238,13 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
           const parsed = measurementSchema.safeParse({
             date: values.date,
             weightKg: num("weightKg"),
-            ...Object.fromEntries(FIELDS.map((f) => [f.key, num(f.key)])),
+            ...Object.fromEntries(fields.map((f) => [f.key, num(f.key)])),
           });
           if (!parsed.success) {
             setError("Check the numbers. Each one must be a positive measurement.");
             return;
           }
-          if (FIELDS.every((f) => parsed.data[f.key] === undefined) && parsed.data.weightKg === undefined) {
+          if (fields.every((f) => parsed.data[f.key] === undefined) && parsed.data.weightKg === undefined) {
             setError("Enter at least one measurement.");
             return;
           }
@@ -164,7 +263,7 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
           />
         </label>
         <NumberField label="Weight (kg)" name="weightKg" values={values} setValues={setValues} />
-        {FIELDS.map((f) => (
+        {fields.map((f) => (
           <NumberField key={f.key} label={`${f.label} (${units})`} name={f.key} values={values} setValues={setValues} />
         ))}
         <button
@@ -186,10 +285,14 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
             <thead>
               <tr className="border-b border-line text-left text-muted">
                 <th className="py-2 pr-3 font-semibold">Date</th>
-                {FIELDS.map((f) => (
+                {fields.map((f) => (
                   <th key={f.key} className="py-2 pr-3 font-semibold">{f.label}</th>
                 ))}
-                <th className="py-2 pr-3 font-semibold" title="Waist ÷ hips. Lower means a more defined waist.">W:H</th>
+                {showRatio && (
+                  <th className="py-2 pr-3 font-semibold" title="Waist ÷ hips. Lower means a more defined waist.">
+                    W:H
+                  </th>
+                )}
                 <th className="sr-only">Delete</th>
               </tr>
             </thead>
@@ -197,7 +300,7 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
               {measurements.map((m) => (
                 <tr key={m.id} className="border-b border-line">
                   <td className="py-2.5 pr-3 font-mono">{m.date}</td>
-                  {FIELDS.map((f) => {
+                  {fields.map((f) => {
                     const v = toDisplay(m[f.key]);
                     const base = toDisplay(first?.[f.key]);
                     const delta = v !== undefined && base !== undefined && m !== first ? v - base : undefined;
@@ -213,9 +316,11 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
                       </td>
                     );
                   })}
-                  <td className="py-2.5 pr-3 font-mono">
-                    {m.waistCm && m.hipsCm ? (m.waistCm / m.hipsCm).toFixed(2) : "–"}
-                  </td>
+                  {showRatio && (
+                    <td className="py-2.5 pr-3 font-mono">
+                      {m.waistCm && m.hipsCm ? (m.waistCm / m.hipsCm).toFixed(2) : "–"}
+                    </td>
+                  )}
                   <td className="py-2.5 text-right">
                     <button
                       type="button"
@@ -230,7 +335,9 @@ function Measurements({ measurements, units }: { measurements: Measurement[]; un
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-xs text-muted">Small numbers show the change since your first entry. W:H is waist ÷ hips.</p>
+          <p className="mt-2 text-xs text-muted">
+            Small numbers show the change since your first entry.{showRatio ? " W:H is waist ÷ hips." : ""}
+          </p>
         </div>
       )}
     </section>

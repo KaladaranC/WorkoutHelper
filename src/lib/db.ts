@@ -18,6 +18,8 @@ export const setLogSchema = z.object({
   /** Form cue text → how many reps it fired on. */
   cues: z.record(z.string(), z.number()),
   tracked: z.boolean(),
+  /** Dumbbell weight used, for moves that take weights. */
+  weightKg: z.number().nonnegative().max(500).optional(),
   at: z.number(),
 });
 export type SetLog = z.infer<typeof setLogSchema>;
@@ -39,14 +41,22 @@ export const measurementSchema = z.object({
   weightKg: z.number().positive().max(400).optional(),
   bustCm: cm,
   underbustCm: cm,
+  chestCm: cm,
+  armCm: cm,
   waistCm: cm,
   hipsCm: cm,
   thighCm: cm,
 });
 export type Measurement = z.infer<typeof measurementSchema>;
 
+export const GENDERS = ["female", "male", "unspecified"] as const;
+export type Gender = (typeof GENDERS)[number];
+
 export const profileSchema = z.object({
   name: z.string().trim().min(1).max(40),
+  // Defaults keep profiles saved before these fields existed working.
+  gender: z.enum(GENDERS).default("female"),
+  plan: z.enum(["shape", "ppl"]).default("shape"),
   startedOn: z.string(),
   voice: z.boolean(),
   model: z.enum(["lite", "full"]),
@@ -54,7 +64,11 @@ export const profileSchema = z.object({
 });
 export type Profile = z.infer<typeof profileSchema>;
 
-type SettingRow = { key: "profile"; value: Profile };
+export function defaultPlanFor(gender: Gender): Profile["plan"] {
+  return gender === "male" ? "ppl" : "shape";
+}
+
+type SettingRow = { key: "profile"; value: z.input<typeof profileSchema> };
 
 class WorkoutDB extends Dexie {
   sessions!: EntityTable<Session, "id">;
@@ -78,7 +92,20 @@ export async function saveProfile(profile: Profile) {
 }
 
 export async function getProfile(): Promise<Profile | null> {
-  return (await db.settings.get("profile"))?.value ?? null;
+  const raw = (await db.settings.get("profile"))?.value;
+  if (!raw) return null;
+  const parsed = profileSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The most recent weight logged for an exercise, to start the next set from. */
+export async function lastWeight(exerciseId: string): Promise<number | undefined> {
+  const sessions = await db.sessions.orderBy("startedAt").reverse().toArray();
+  for (const s of sessions) {
+    const sets = s.sets.filter((x) => x.exerciseId === exerciseId && x.weightKg !== undefined);
+    if (sets.length) return sets.sort((a, b) => b.at - a.at)[0].weightKg;
+  }
+  return undefined;
 }
 
 /** Resume the active session for a day, or start a new one. */

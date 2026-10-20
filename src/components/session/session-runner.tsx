@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, Camera, ChevronDown, Hand, SkipForward, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Minus, Plus, SkipForward, X } from "lucide-react";
 import { CoachPanel, type CoachStats } from "@/components/coach/coach-panel";
 import { bandClass } from "@/components/band";
 import { MoveAnimation } from "@/components/figure/move-animation";
-import { MoveThumb } from "@/components/figure/move-figure";
-import { COOL_DOWN, estimateMinutes, findDay, WARM_UP, type Prescription, type ProgramDay } from "@/lib/data/program";
-import { db, finishSession, logSet, openSession, type Session } from "@/lib/db";
+import { MoveRow } from "@/components/move-row";
+import { estimateMinutes, findDay, PLANS, type Prescription, type ProgramDay } from "@/lib/data/program";
+import { db, finishSession, lastWeight, logSet, openSession, type Session } from "@/lib/db";
 import { useProfile, useSessions } from "@/lib/hooks";
 import { speak } from "@/lib/speech";
 import { cn, formatSeconds } from "@/lib/utils";
@@ -61,7 +61,7 @@ export function SessionRunner({ dayId }: { dayId: string }) {
     }
   };
 
-  const finishSet = async () => {
+  const finishSet = async (weightKg?: number) => {
     if (!session) return;
     const p = day.items[cursor.item];
     await logSet(session.id, {
@@ -69,6 +69,7 @@ export function SessionRunner({ dayId }: { dayId: string }) {
       setIndex: cursor.set,
       target: targetFor(p),
       ...stats.current,
+      weightKg,
       at: Date.now(),
     });
     const next = nextCursor(day, cursor);
@@ -163,7 +164,7 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
       <section aria-labelledby="warm">
         <h2 id="warm" className="text-sm font-semibold text-stage-muted">Warm up first, about 5 min</h2>
         <ul className="mt-2 flex flex-col gap-1">
-          {WARM_UP.map((w) => (
+          {PLANS[day.planId].warmUp.map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>
@@ -175,7 +176,7 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
         <ol className="mt-2 divide-y divide-white/10 border-y border-white/10">
           {day.items.map((p) => (
             <li key={p.exercise.id}>
-              <MoveRow p={p} />
+              <MoveRow p={p} tone="stage" />
             </li>
           ))}
         </ol>
@@ -197,61 +198,6 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
   );
 }
 
-/** A move in the session list that opens in place to show the tutorial. */
-function MoveRow({ p }: { p: Prescription }) {
-  const [open, setOpen] = useState(false);
-  const e = p.exercise;
-  const panelId = `how-${e.id}`;
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex w-full items-center gap-4 py-2.5 text-left hover:bg-white/5"
-      >
-        <MoveThumb id={e.id} className="h-12 w-16" />
-        <span className="flex-1 font-semibold">{e.name}</span>
-        <span className="font-mono text-sm tabular-nums text-stage-muted">
-          {p.sets}×{p.amount}
-          {e.unit === "seconds" ? "s" : ""}
-          {e.perSide ? "/side" : ""}
-        </span>
-        {e.tracking.kind === "manual" ? (
-          <Hand className="size-4 text-stage-muted" aria-label="Counted by hand" />
-        ) : (
-          <Camera className="size-4" aria-label="Counted by camera" />
-        )}
-        <ChevronDown className={cn("size-4 text-stage-muted transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div id={panelId} className="flex flex-col gap-4 pb-5">
-          <MoveAnimation id={e.id} className="h-48 rounded-2xl bg-white/5 p-3" />
-          <ol className="flex list-decimal flex-col gap-2 pl-5 marker:font-mono marker:text-stage-muted">
-            {e.steps.map((s) => (
-              <li key={s} className="max-w-[60ch] pl-1">
-                {s}
-              </li>
-            ))}
-          </ol>
-          <p>
-            <span className="text-sm font-semibold text-stage-muted">Cues: </span>
-            {e.cues.join(" · ")}
-          </p>
-          <p className="text-sm text-stage-muted">
-            {e.tracking.kind === "manual" ? e.tracking.reason : e.tracking.setup}
-          </p>
-          <Link href={`/moves/${e.id}`} className="self-start text-sm font-semibold underline underline-offset-4">
-            Common mistakes and easier or harder versions
-          </Link>
-        </div>
-      )}
-    </>
-  );
-}
-
 // ─── Set ────────────────────────────────────────────────────────────────────
 
 function SetScreen({
@@ -267,7 +213,7 @@ function SetScreen({
   cursor: Cursor;
   model: "lite" | "full";
   onStats: (s: CoachStats) => void;
-  onFinish: () => void;
+  onFinish: (weightKg?: number) => void;
   onSkip: () => void;
   onExit: () => void;
 }) {
@@ -276,6 +222,28 @@ function SetScreen({
   const target = targetFor(p);
   const [howTo, setHowTo] = useState(false);
   const [busy, setBusy] = useState(false);
+  const usesWeights = e.equipment === "dumbbells";
+  const [weight, setWeight] = useState<number | null>(null);
+  const [lastKg, setLastKg] = useState<number | undefined>();
+  // Survives the coach panel unmounting while "How to" is open.
+  const latest = useRef<CoachStats | undefined>(undefined);
+  const [resumeFrom, setResumeFrom] = useState<CoachStats | undefined>();
+  const reportStats = useCallback(
+    (st: CoachStats) => {
+      latest.current = st;
+      onStats(st);
+    },
+    [onStats],
+  );
+
+  useEffect(() => {
+    if (!usesWeights) return;
+    lastWeight(e.id).then((kg) => {
+      setLastKg(kg);
+      setWeight((w) => w ?? kg ?? 5);
+    });
+  }, [e.id, usesWeights]);
+
   const totalSets = day.items.reduce((n, i) => n + i.sets, 0);
   const setsBefore = day.items.slice(0, cursor.item).reduce((n, i) => n + i.sets, 0) + cursor.set;
 
@@ -300,7 +268,10 @@ function SetScreen({
         </div>
         <button
           type="button"
-          onClick={() => setHowTo((v) => !v)}
+          onClick={() => {
+            if (!howTo) setResumeFrom(latest.current);
+            setHowTo(!howTo);
+          }}
           aria-expanded={howTo}
           className="press inline-flex h-10 items-center gap-1.5 rounded-full border border-white/15 px-3.5 text-sm hover:border-white/35"
         >
@@ -334,9 +305,19 @@ function SetScreen({
           )}
         </div>
       ) : (
-        <CoachPanel exercise={e} target={target} model={model} cameraDefault onStats={onStats} />
+        <CoachPanel
+          exercise={e}
+          target={target}
+          model={model}
+          cameraDefault
+          initial={resumeFrom}
+          onStats={reportStats}
+        />
       )}
 
+      {usesWeights && weight !== null && (
+        <WeightPicker kg={weight} lastKg={lastKg} onChange={setWeight} />
+      )}
       <footer className="flex items-center gap-3 px-4 pt-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
         <button
           type="button"
@@ -350,13 +331,57 @@ function SetScreen({
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            await onFinish();
+            await onFinish(usesWeights && weight !== null ? weight : undefined);
           }}
           className="press flex h-14 flex-1 items-center justify-center rounded-full bg-stage-foreground text-lg font-semibold text-stage disabled:opacity-60"
         >
           Finish set
         </button>
       </footer>
+    </div>
+  );
+}
+
+function WeightPicker({ kg, lastKg, onChange }: { kg: number; lastKg?: number; onChange: (kg: number) => void }) {
+  const step = kg < 10 ? 0.5 : 1;
+  const set = (v: number) => onChange(Math.max(0, Math.round(v * 2) / 2));
+  return (
+    <div className="flex items-center gap-3 border-t border-white/10 px-4 pt-3">
+      <div className="flex-1">
+        <p className="text-sm font-semibold">Dumbbell weight (each)</p>
+        <p className="text-xs text-stage-muted">
+          {lastKg === undefined ? "Pick a weight you can lift for every rep with 1–2 to spare." : `Last time: ${lastKg} kg`}
+        </p>
+      </div>
+      <button
+        type="button"
+        aria-label="Less weight"
+        onClick={() => set(kg - step)}
+        className="press grid size-10 place-items-center rounded-full border border-white/15 hover:border-white/35"
+      >
+        <Minus className="size-4" />
+      </button>
+      <label className="flex items-baseline gap-1">
+        <span className="sr-only">Weight in kilograms</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={0.5}
+          value={kg}
+          onChange={(ev) => set(Number(ev.target.value) || 0)}
+          className="w-16 rounded-lg bg-white/10 px-2 py-1.5 text-center font-mono text-lg outline-none focus:ring-2 focus:ring-primary"
+        />
+        <span className="text-sm text-stage-muted">kg</span>
+      </label>
+      <button
+        type="button"
+        aria-label="More weight"
+        onClick={() => set(kg + step)}
+        className="press grid size-10 place-items-center rounded-full border border-white/15 hover:border-white/35"
+      >
+        <Plus className="size-4" />
+      </button>
     </div>
   );
 }
@@ -488,7 +513,7 @@ function Summary({ day, sessionId }: { day: ProgramDay; sessionId: string }) {
       <section>
         <h2 className="text-sm font-semibold text-stage-muted">Cool down</h2>
         <ul className="mt-2 flex flex-col gap-1">
-          {COOL_DOWN.map((c) => (
+          {PLANS[day.planId].coolDown.map((c) => (
             <li key={c}>{c}</li>
           ))}
         </ul>

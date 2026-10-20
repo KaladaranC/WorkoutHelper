@@ -16,6 +16,7 @@ export function FigureSVG({
   focus,
   title,
   className,
+  dumbbells = false,
 }: {
   frame: Frame;
   box: Box;
@@ -23,6 +24,7 @@ export function FigureSVG({
   focus?: FocusJoint;
   title?: string;
   className?: string;
+  dumbbells?: boolean;
 }) {
   const w = box.maxX - box.minX + PAD * 2;
   const h = box.maxY - box.minY + PAD * 2;
@@ -42,6 +44,7 @@ export function FigureSVG({
       <path d={line(l.ankle, l.toe)} strokeWidth={4.5} />
       <path d={line(l.shoulder, l.elbow)} strokeWidth={6} />
       <path d={line(l.elbow, l.wrist)} strokeWidth={5} />
+      {dumbbells && <Dumbbell elbow={l.elbow} wrist={l.wrist} line={line} />}
     </g>
   );
 
@@ -87,9 +90,40 @@ export function FigureSVG({
   );
 }
 
+/** A dumbbell held across the hand: handle perpendicular to the forearm, a plate at each end. */
+function Dumbbell({ elbow, wrist, line }: { elbow: Pt; wrist: Pt; line: (a: Pt, b: Pt) => string }) {
+  const dx = wrist[0] - elbow[0];
+  const dy = wrist[1] - elbow[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const along: Pt = [dx / len, dy / len];
+  const across: Pt = [-along[1], along[0]];
+  const at = (k: number, j = 0): Pt => [
+    wrist[0] + along[0] * 1.5 + across[0] * k + along[0] * j,
+    wrist[1] + along[1] * 1.5 + across[1] * k + along[1] * j,
+  ];
+  return (
+    <g>
+      <path d={line(at(-6), at(6))} strokeWidth={2.2} />
+      <path d={line(at(-6, -3), at(-6, 3))} strokeWidth={4.5} strokeLinecap="butt" />
+      <path d={line(at(6, -3), at(6, 3))} strokeWidth={4.5} strokeLinecap="butt" />
+    </g>
+  );
+}
+
 function PropShape({ prop, X, Y }: { prop: Prop; X: (x: number) => number; Y: (y: number) => number }) {
   if (prop.kind === "wall") {
     return <path d={`M${X(prop.x)},${Y(0)}V${Y(110)}`} strokeWidth={2.5} fill="none" />;
+  }
+  if (prop.kind === "bar") {
+    return <path d={`M${X(prop.x)},${Y(prop.y)}H${X(prop.x + prop.w)}`} strokeWidth={3} fill="none" strokeLinecap="round" />;
+  }
+  if (prop.kind === "table") {
+    return (
+      <g fill="none" strokeLinecap="round">
+        <path d={`M${X(prop.x)},${Y(prop.top)}H${X(prop.x + prop.w)}`} strokeWidth={4} />
+        <path d={`M${X(prop.x + 3)},${Y(0)}V${Y(prop.top)}M${X(prop.x + prop.w - 3)},${Y(0)}V${Y(prop.top)}`} strokeWidth={2.5} />
+      </g>
+    );
   }
   if (prop.kind === "couch") {
     const backX = prop.back === "left" ? prop.x : prop.x + prop.w - 9;

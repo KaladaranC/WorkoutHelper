@@ -1,37 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { EXERCISES } from "./exercises";
-import { nextDay, PROGRAM, TOTAL_WEEKS, DAYS_PER_WEEK } from "./program";
+import { EXERCISES, type Area } from "./exercises";
+import { ALL_DAYS, DAYS_PER_WEEK, nextDay, PLANS, PROGRAMS, TOTAL_WEEKS, type PlanId } from "./program";
 
-describe("program", () => {
+const daysHitting = (plan: PlanId, week: number, area: Area) =>
+  PROGRAMS[plan]
+    .filter((d) => d.week === week)
+    .filter((d) => d.items.some((i) => i.exercise.areas.includes(area))).length;
+
+describe.each(Object.keys(PLANS) as PlanId[])("%s plan", (plan) => {
   it("has four sessions in each of eight weeks", () => {
-    expect(PROGRAM).toHaveLength(TOTAL_WEEKS * DAYS_PER_WEEK);
-    expect(new Set(PROGRAM.map((d) => d.id)).size).toBe(PROGRAM.length);
+    expect(PROGRAMS[plan]).toHaveLength(TOTAL_WEEKS * DAYS_PER_WEEK);
   });
 
   it("progresses inside a phase", () => {
-    const w3 = PROGRAM.find((d) => d.id === "w3-a")!;
-    const w5 = PROGRAM.find((d) => d.id === "w5-a")!;
+    const w3 = PROGRAMS[plan].find((d) => d.week === 3 && d.key === "a")!;
+    const w5 = PROGRAMS[plan].find((d) => d.week === 5 && d.key === "a")!;
     expect(w5.items[0].amount).toBe(w3.items[0].amount + 4);
   });
 
-  it("trains glutes and thighs at least twice a week, core every session", () => {
+  it("starts at the first day and moves on in order", () => {
+    const [first, second] = PROGRAMS[plan];
+    expect(nextDay(plan, [])?.id).toBe(first.id);
+    expect(nextDay(plan, [first.id])?.id).toBe(second.id);
+  });
+});
+
+describe("plans", () => {
+  it("use ids that never collide across plans", () => {
+    expect(new Set(ALL_DAYS.map((d) => d.id)).size).toBe(ALL_DAYS.length);
+  });
+
+  it("keep the original plan's day ids so saved history stays valid", () => {
+    expect(PROGRAMS.shape[0].id).toBe("w1-a");
+  });
+
+  it("shape: glutes, thighs and chest twice a week, core every session", () => {
     for (let week = 1; week <= TOTAL_WEEKS; week++) {
-      const days = PROGRAM.filter((d) => d.week === week);
-      const hits = (goal: string) =>
-        days.filter((d) => d.items.some((i) => i.exercise.goals.includes(goal as never))).length;
-      expect(hits("glutes")).toBeGreaterThanOrEqual(2);
-      expect(hits("thighs")).toBeGreaterThanOrEqual(2);
-      expect(hits("bust")).toBeGreaterThanOrEqual(2);
-      expect(hits("waist")).toBe(days.length);
+      expect(daysHitting("shape", week, "glutes")).toBeGreaterThanOrEqual(2);
+      expect(daysHitting("shape", week, "legs")).toBeGreaterThanOrEqual(2);
+      expect(daysHitting("shape", week, "chest")).toBeGreaterThanOrEqual(2);
+      expect(daysHitting("shape", week, "core")).toBe(DAYS_PER_WEEK);
     }
   });
 
-  it("picks the first unfinished day", () => {
-    expect(nextDay([])?.id).toBe("w1-a");
-    expect(nextDay(["w1-a", "w1-b"])?.id).toBe("w1-c");
+  it("ppl: every upper-body muscle at least twice a week, legs and core covered", () => {
+    for (let week = 1; week <= TOTAL_WEEKS; week++) {
+      for (const area of ["chest", "back", "shoulders", "biceps", "triceps"] as Area[]) {
+        expect(daysHitting("ppl", week, area), `${area} in week ${week}`).toBeGreaterThanOrEqual(2);
+      }
+      expect(daysHitting("ppl", week, "legs")).toBeGreaterThanOrEqual(2);
+      expect(daysHitting("ppl", week, "core")).toBeGreaterThanOrEqual(3);
+    }
   });
 
-  it("only references valid easier/harder exercises", () => {
+  it("only reference valid easier/harder exercises", () => {
     const ids = new Set(EXERCISES.map((e) => e.id));
     for (const e of EXERCISES) {
       if (e.easier) expect(ids).toContain(e.easier);

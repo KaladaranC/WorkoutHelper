@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SessionRunner } from "@/components/session/session-runner";
-import { findDay, PROGRAM } from "@/lib/data/program";
+import { ALL_DAYS, findDay } from "@/lib/data/program";
 
 export function generateStaticParams() {
-  return PROGRAM.map((d) => ({ dayId: d.id }));
+  return ALL_DAYS.map((d) => ({ dayId: d.id }));
 }
 
 export async function generateMetadata({ params }: PageProps<"/session/[dayId]">): Promise<Metadata> {

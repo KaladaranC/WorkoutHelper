@@ -4,7 +4,12 @@
 
 ## Project overview
 
-Spotter is an 8-week home workout app, focused first on women training glutes, thighs, bust (chest + posture) and waist. The phone's camera counts reps and gives spoken form cues using an on-device pose model.
+Spotter is an 8-week home workout app with two plans, chosen at onboarding from the user's gender (and switchable in Settings):
+
+- **shape**: glutes, thighs, chest/bust and waist. Bodyweight only. Day ids `w1-a` … (kept from v1 so saved history stays valid).
+- **ppl**: Push / Pull / Legs / Arms & shoulders for muscle gain. Needs dumbbells (weight is logged per set); pull-up bar from week 3. Day ids `ppl-w1-a` ….
+
+The phone's camera counts reps and gives spoken form cues using an on-device pose model.
 
 It is **fully client-side**: a Next.js static export hosted on Vercel, with all data in the browser's IndexedDB. There is no server, no account, and camera video never leaves the device.
 
@@ -51,7 +56,8 @@ src/lib/pose/         geometry, metrics, motion tracker (pure + tested)
 ## Conventions
 
 - Keep tracking logic pure and in `lib/pose`; components only wire camera, speech and UI to it. Add a test in `tracker.test.ts` for any state-machine change.
-- Program rules (phases, progression, weekly balance) live in `lib/data/program.ts`, guarded by `program.test.ts`.
+- Program rules (plans, phases, progression, weekly balance) live in `lib/data/program.ts`, guarded by `program.test.ts`. Exercises are tagged with body `areas`; plans can relabel an area (e.g. legs → "Thighs") via `areaLabels`.
+- Profiles saved before `gender`/`plan` existed are upgraded by the Zod defaults in `profileSchema`. Always read profiles through `useProfile`/`getProfile`, never raw from Dexie.
 - Theme tokens are CSS variables on `:root` mapped through one `@theme inline` block in `globals.css`. Use semantic utilities (`bg-primary`, `text-muted`, `bg-stage`). The workout "stage" is always dark.
 - Copy is plain, second person, and honest about what training can and can't change (see `/science`). Don't promise breast growth or spot reduction.
 - No server features: no route handlers that read requests, server actions, cookies or middleware. They break the static export.
@@ -75,5 +81,4 @@ Import the repo into Vercel. No environment variables are needed. Vercel detects
 
 - Rep thresholds are first estimates from joint biomechanics and haven't been tuned against real footage yet. Expect to adjust `restAt`/`peakAt` per move after testing.
 - Fire hydrants, clamshells, dead bugs, bird dogs, bicycle crunches, supermen, reverse snow angels and timed static moves are counted by hand. One camera can't measure them reliably.
-- Switching from hand counting back to the camera restarts the count for that set.
 - Data lives in one browser. Clearing site data erases it; Settings → Export backup is the only way to move it.

@@ -4,8 +4,19 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Camera, Hand } from "lucide-react";
 import { MoveAnimation } from "@/components/figure/move-animation";
 import { MoveFrame } from "@/components/figure/move-figure";
-import { EXERCISES, findExercise, GOAL_LABEL } from "@/lib/data/exercises";
+import { AREA_LABEL, EXERCISES, findExercise, type Exercise } from "@/lib/data/exercises";
 import { ILLUSTRATIONS } from "@/lib/data/illustrations";
+
+const EQUIPMENT_LABEL: Record<Exercise["equipment"], string> = {
+  none: "None",
+  mat: "A mat or soft floor",
+  chair: "A sturdy chair",
+  couch: "A couch or sturdy bed",
+  wall: "A wall",
+  dumbbells: "Dumbbells",
+  bar: "A pull-up bar",
+  table: "A sturdy table",
+};
 
 export function generateStaticParams() {
   return EXERCISES.map((e) => ({ id: e.id }));
@@ -32,7 +43,9 @@ export default async function MovePage({ params }: PageProps<"/moves/[id]">) {
         </Link>
         <h1 className="font-scoreboard mt-4 text-[clamp(3rem,12vw,4.75rem)] font-extrabold uppercase">{e.name}</h1>
         <p className="mt-2 text-sm font-semibold text-muted">
-          {e.goals.map((g) => GOAL_LABEL[g]).join(" · ")} · {e.muscles}
+          {e.areas.map((a) => AREA_LABEL[a]).join(" · ")} · {e.muscles}
+        </p>
+        <p className="mt-1 text-sm text-muted">Equipment: {EQUIPMENT_LABEL[e.equipment]}
         </p>
         <p className="mt-4 max-w-[60ch] text-lg">{e.why}</p>
       </div>

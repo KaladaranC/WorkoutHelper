@@ -43,7 +43,13 @@ export function MoveThumb({ id, className }: { id: string; className?: string })
       )}
     >
       {data && (
-        <FigureSVG frame={data.frames.end} box={data.box} props={data.ill.props} className="size-full" />
+        <FigureSVG
+          frame={data.frames.end}
+          box={data.box}
+          props={data.ill.props}
+          dumbbells={data.ill.dumbbells}
+          className="size-full"
+        />
       )}
     </span>
   );
@@ -67,6 +73,7 @@ export function MoveFrame({
       frame={data.frames[which]}
       box={data.box}
       props={data.ill.props}
+      dumbbells={data.ill.dumbbells}
       focus={focusJoint(id)}
       title={`${name}, ${which === "start" ? "start" : "finish"} position`}
       className={className}

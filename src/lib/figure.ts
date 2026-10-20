@@ -35,7 +35,9 @@ export type PoseSpec = {
 export type Prop =
   | { kind: "couch"; x: number; w: number; top: number; back: "left" | "right" }
   | { kind: "chair"; x: number; w: number; top: number; back: "left" | "right" }
-  | { kind: "wall"; x: number };
+  | { kind: "wall"; x: number }
+  | { kind: "table"; x: number; w: number; top: number }
+  | { kind: "bar"; x: number; w: number; y: number };
 
 export type Illustration = {
   view: "side" | "front";
@@ -43,6 +45,8 @@ export type Illustration = {
   /** Omitted for static holds. */
   end?: PoseSpec;
   props?: Prop[];
+  /** Draw a dumbbell in each hand. */
+  dumbbells?: boolean;
 };
 
 export type Limbs = {
@@ -208,6 +212,12 @@ export function bounds(frames: Frame[], props: Prop[] = []): Box {
   for (const p of props) {
     if (p.kind === "wall") {
       take([p.x, b.maxY], 2);
+    } else if (p.kind === "bar") {
+      take([p.x, p.y + 2], 1);
+      take([p.x + p.w, p.y - 2], 1);
+    } else if (p.kind === "table") {
+      take([p.x, p.top + 2], 1);
+      take([p.x + p.w, 0], 1);
     } else {
       take([p.x, p.top + (p.kind === "couch" ? 14 : 22)], 1);
       take([p.x + p.w, 0], 1);

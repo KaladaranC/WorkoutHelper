@@ -354,4 +354,134 @@ export const ILLUSTRATIONS: Record<string, Illustration> = {
     start: { ...PUSH_UP_TOP, leg: { ankle: [4, 7] }, farLeg: { ankle: [-44, 4] } },
     end: { ...PUSH_UP_TOP, leg: { ankle: [-44, 4] }, farLeg: { ankle: [4, 7] } },
   },
+
+  // ─── Push ──────────────────────────────────────────────────────────────
+  "decline-push-up": {
+    view: "side",
+    props: [{ kind: "chair", x: -62, w: 22, top: 30, back: "left" }],
+    start: { hip: [-3, 32], shoulder: [28, 31], leg: { ankle: [-46, 33] }, arm: { wrist: [29, 3] } },
+    end: { hip: [-4, 23], shoulder: [27, 15], leg: { ankle: [-46, 33] }, arm: { wrist: [29, 3], elbow: [20, 17] } },
+  },
+  "diamond-push-up": {
+    view: "side",
+    start: PUSH_UP_TOP,
+    end: { hip: [-1, 10], shoulder: [30, 14], leg: { ankle: [-44, 4] }, arm: { wrist: [29, 3], elbow: [22, 17] } },
+  },
+  "pike-push-up": {
+    view: "side",
+    start: { hip: [0, 44], shoulder: [26, 30], leg: { ankle: [-20, 3] }, arm: { wrist: [32, 3] } },
+    end: { hip: [6, 36], shoulder: [30, 14], leg: { ankle: [-20, 3] }, arm: { wrist: [34, 3], elbow: [22, 16] } },
+  },
+  "db-floor-press": {
+    view: "side",
+    dumbbells: true,
+    start: { ...SUPINE, arm: { wrist: [-31, 35] } },
+    end: { ...SUPINE, arm: { wrist: [-24, 19], elbow: [-22, 4] } },
+  },
+  "db-fly": {
+    view: "side",
+    dumbbells: true,
+    start: { ...SUPINE, arm: { wrist: [-31, 35] }, farArm: { wrist: [-31, 35] } },
+    end: {
+      ...SUPINE,
+      arm: { wrist: [-48, 10], elbow: [-42, 17] },
+      farArm: { wrist: [-16, 10], elbow: [-22, 17] },
+    },
+  },
+  "db-shoulder-press": {
+    view: "front",
+    dumbbells: true,
+    start: { ...STAND_FRONT, arm: { wrist: [22, 86], elbow: [24, 72] } },
+    end: { ...STAND_FRONT, arm: { wrist: [13, 106], bend: -1 } },
+  },
+  "db-lateral-raise": {
+    view: "front",
+    dumbbells: true,
+    start: { ...STAND_FRONT, arm: { wrist: [14, 50], bend: -1 } },
+    end: { ...STAND_FRONT, arm: { wrist: [38, 74], bend: -1 } },
+  },
+  "db-overhead-extension": {
+    view: "side",
+    dumbbells: true,
+    start: { ...STAND, arm: { wrist: [3, 107], bend: -1 } },
+    end: { ...STAND, arm: { wrist: [-8, 84], elbow: [4, 93] } },
+  },
+
+  // ─── Pull ──────────────────────────────────────────────────────────────
+  "pull-up": {
+    view: "front",
+    props: [{ kind: "bar", x: -30, w: 60, y: 117 }],
+    start: { hip: [0, 58], shoulder: [0, 90], leg: { ankle: [5, 16] }, arm: { wrist: [14, 116], bend: -1 } },
+    end: { hip: [0, 78], shoulder: [0, 108], leg: { ankle: [5, 36] }, arm: { wrist: [14, 116], bend: -1 } },
+  },
+  "inverted-row": {
+    view: "side",
+    props: [{ kind: "table", x: 12, w: 48, top: 41 }],
+    start: { hip: [-2, 10], shoulder: [30, 15], leg: { ankle: [-44, 3] }, arm: { wrist: [25, 41] } },
+    end: { hip: [-4, 20], shoulder: [26, 33], leg: { ankle: [-44, 3] }, arm: { wrist: [25, 41], elbow: [13, 35] } },
+  },
+  "db-bent-over-row": {
+    view: "side",
+    dumbbells: true,
+    start: { hip: [-10, 44], shoulder: [18, 58], leg: { ankle: [1, 3] }, arm: { wrist: [19, 30] } },
+    end: { hip: [-10, 44], shoulder: [18, 58], leg: { ankle: [1, 3] }, arm: { wrist: [5, 46], elbow: [4, 61] } },
+  },
+  "db-pullover": {
+    view: "side",
+    dumbbells: true,
+    start: { ...SUPINE, arm: { wrist: [-31, 35] } },
+    end: { ...SUPINE, arm: { wrist: [-60, 10] } },
+  },
+  "rear-delt-fly": {
+    view: "side",
+    dumbbells: true,
+    start: { hip: [-10, 44], shoulder: [18, 58], leg: { ankle: [1, 3] }, arm: { wrist: [19, 30] } },
+    end: { hip: [-10, 44], shoulder: [18, 58], leg: { ankle: [1, 3] }, arm: { wrist: [26, 56], elbow: [24, 52] } },
+  },
+  "db-curl": {
+    view: "side",
+    dumbbells: true,
+    start: { ...STAND, arm: { wrist: [2, 49], elbow: [1, 63] } },
+    end: { ...STAND, arm: { wrist: [12, 73], elbow: [1, 63] } },
+  },
+  "hammer-curl": {
+    view: "side",
+    dumbbells: true,
+    start: { ...STAND, arm: { wrist: [2, 49], elbow: [1, 63] } },
+    end: { ...STAND, arm: { wrist: [12, 73], elbow: [1, 63] } },
+  },
+
+  // ─── Legs & core ───────────────────────────────────────────────────────
+  "goblet-squat": {
+    view: "side",
+    dumbbells: true,
+    start: { ...STAND, arm: { wrist: [9, 72], elbow: [5, 64] } },
+    end: {
+      hip: [-12, 26],
+      shoulder: [6, 52],
+      leg: { ankle: [1, 3] },
+      arm: { wrist: [16, 47], elbow: [13, 39] },
+    },
+  },
+  "db-rdl": {
+    view: "side",
+    dumbbells: true,
+    start: { ...STAND, arm: { wrist: [3, 49], bend: -1 } },
+    end: { hip: [-12, 42], shoulder: [17, 56], leg: { ankle: [1, 3] }, arm: { wrist: [18, 28] } },
+  },
+  "calf-raise": {
+    view: "side",
+    start: STAND,
+    end: {
+      hip: [0, 51],
+      shoulder: [0, 83],
+      leg: { ankle: [1, 8], foot: -50 },
+      arm: { wrist: [2, 54], bend: -1 },
+    },
+  },
+  "lying-leg-raise": {
+    view: "side",
+    start: { ...SUPINE, leg: { ankle: [43, 5] } },
+    end: { ...SUPINE, leg: { ankle: [8, 49] } },
+  },
 };

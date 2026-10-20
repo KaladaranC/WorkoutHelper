@@ -3,25 +3,36 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { Band } from "@/components/band";
-import { PHASES, PROGRAM } from "@/lib/data/program";
-import { completedDayIds, useSessions } from "@/lib/hooks";
+import { PLANS, PROGRAMS } from "@/lib/data/program";
+import { completedDayIds, useProfile, useSessions } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 export default function PlanPage() {
   const sessions = useSessions();
+  const profile = useProfile();
+  if (profile === undefined) return null;
+  const plan = PLANS[profile?.plan ?? "shape"];
+  const program = PROGRAMS[plan.id];
   const done = new Set(sessions ? completedDayIds(sessions) : []);
 
   return (
     <div className="flex flex-col gap-12">
       <header className="pt-4">
         <h1 className="font-scoreboard text-6xl font-extrabold uppercase">The plan</h1>
-        <p className="mt-3 max-w-[56ch] text-muted">
-          Three phases over eight weeks, four sessions a week. Each phase is named after a resistance band colour, from
-          light to heavy, because each one asks more of you than the last.
+        <p className="mt-2 font-semibold">{plan.name}</p>
+        <p className="mt-2 max-w-[56ch] text-muted">
+          Three phases over eight weeks, four sessions a week. Each phase wears a resistance band colour, from light to
+          heavy, because each one asks more of you than the last. Needs: {plan.equipment}
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          Want a different plan?{" "}
+          <Link href="/settings" className="font-semibold text-foreground underline underline-offset-4">
+            Switch in Settings
+          </Link>
         </p>
       </header>
 
-      {PHASES.map((phase) => (
+      {plan.phases.map((phase) => (
         <section key={phase.id} aria-labelledby={`phase-${phase.id}`}>
           <div className="flex items-center gap-3">
             <Band phase={phase} className="w-14" />
@@ -39,7 +50,7 @@ export default function PlanPage() {
               <div key={week}>
                 <h3 className="text-sm font-semibold">Week {week}</h3>
                 <ul className="mt-2 divide-y divide-line border-y border-line">
-                  {PROGRAM.filter((d) => d.week === week).map((d) => (
+                  {program.filter((d) => d.week === week).map((d) => (
                     <li key={d.id}>
                       <Link href={`/session/${d.id}`} className="flex items-center gap-4 py-3 hover:bg-surface">
                         <span className="font-mono w-6 text-sm text-muted uppercase">{d.key}</span>

@@ -63,6 +63,7 @@ export function MoveAnimation({ id, className, showLabel = true }: { id: string;
         frame={frame}
         box={data.box}
         props={data.ill.props}
+        dumbbells={data.ill.dumbbells}
         focus={focusJoint(id)}
         title={`${name} demonstration`}
         className="max-h-full w-full flex-1"

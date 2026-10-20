@@ -24,16 +24,18 @@ type Props = {
   target: number;
   model: ModelSize;
   cameraDefault: boolean;
+  /** Progress so far in this set, so remounting the panel doesn't reset it. */
+  initial?: CoachStats;
   onStats: (stats: CoachStats) => void;
 };
 
 const EMPTY: CoachStats = { done: 0, goodReps: 0, partials: 0, cues: {}, tracked: false };
 
-export function CoachPanel({ exercise, target, model, cameraDefault, onStats }: Props) {
+export function CoachPanel({ exercise, target, model, cameraDefault, initial, onStats }: Props) {
   const tracking = exercise.tracking;
   const canTrack = tracking.kind !== "manual";
   const [useCamera, setUseCamera] = useState(canTrack && cameraDefault);
-  const [stats, setStats] = useState<CoachStats>(EMPTY);
+  const [stats, setStats] = useState<CoachStats>(initial ?? EMPTY);
 
   const report = useCallback(
     (next: CoachStats) => {
@@ -44,7 +46,10 @@ export function CoachPanel({ exercise, target, model, cameraDefault, onStats }: 
   );
 
   const half = exercise.perSide ? target / 2 : null;
-  const announced = useRef({ half: false, done: false });
+  const announced = useRef({
+    half: half !== null && stats.done >= half,
+    done: stats.done >= target,
+  });
   useEffect(() => {
     const unit = exercise.unit;
     if (half !== null && !announced.current.half && stats.done >= half && stats.done < target) {
@@ -66,6 +71,7 @@ export function CoachPanel({ exercise, target, model, cameraDefault, onStats }: 
           tracking={tracking}
           target={target}
           model={model}
+          base={stats}
           onStats={report}
         />
       ) : (
@@ -102,22 +108,26 @@ function CameraCoach({
   tracking,
   target,
   model,
+  base: baseAtMount,
   onStats,
 }: {
   exercise: Exercise;
   tracking: CameraTracking;
   target: number;
   model: ModelSize;
+  /** Reps or seconds already done this set (e.g. counted by hand before switching). */
+  base: CoachStats;
   onStats: (s: CoachStats) => void;
 }) {
+  const [base] = useState(baseAtMount);
   const tracker = useMemo(() => new MotionTracker(tracking), [tracking]);
   const arc = useRef<ArcApi | null>(null);
-  const cues = useRef<Record<string, number>>({});
-  const [count, setCount] = useState(0);
+  const cues = useRef<Record<string, number>>({ ...base.cues });
+  const [count, setCount] = useState(base.done);
   const [pop, setPop] = useState(0);
   const [cue, setCue] = useState<{ text: string; tone: Tone; id: number } | null>(null);
   const [status, setStatus] = useState<"lost" | "searching" | "ready" | "tracking">("searching");
-  const holdSeconds = useRef(0);
+  const holdSeconds = useRef(base.done);
   const lastTone = useRef<Tone>("neutral");
   const isHold = tracking.kind === "hold";
 
@@ -133,13 +143,14 @@ function CameraCoach({
           speak(isHold ? "Go" : "Ready", { interrupt: true });
         } else if (e.type === "rep") {
           for (const c of e.cues) cues.current[c] = (cues.current[c] ?? 0) + 1;
-          setCount(e.count);
+          const total = base.done + e.count;
+          setCount(total);
           setPop((p) => p + 1);
           lastTone.current = e.good ? "good" : "warn";
           if (e.good) {
-            speak(String(e.count), { interrupt: true });
+            speak(String(total), { interrupt: true });
           } else {
-            speak(`${e.count}. ${e.cues[0]}`, { interrupt: true });
+            speak(`${total}. ${e.cues[0]}`, { interrupt: true });
             showCue(e.cues[0], "warn");
           }
         } else if (e.type === "partial" || e.type === "cue") {
@@ -151,15 +162,15 @@ function CameraCoach({
       }
       if (events.some((e) => e.type === "rep" || e.type === "partial")) {
         onStats({
-          done: frame.reps,
-          goodReps: frame.goodReps,
-          partials: frame.partials,
+          done: base.done + frame.reps,
+          goodReps: base.goodReps + frame.goodReps,
+          partials: base.partials + frame.partials,
           cues: { ...cues.current },
           tracked: true,
         });
       }
     },
-    [isHold, onStats, showCue],
+    [base, isHold, onStats, showCue],
   );
 
   const onFrame = useCallback(
@@ -170,14 +181,14 @@ function CameraCoach({
       if (frame.events.length) handleEvents(frame.events, frame);
 
       if (isHold) {
-        const secs = Math.floor(frame.heldMs / 1000);
+        const secs = base.done + Math.floor(frame.heldMs / 1000);
         if (secs !== holdSeconds.current) {
           holdSeconds.current = secs;
           setCount(secs);
           onStats({ done: secs, goodReps: 0, partials: 0, cues: { ...cues.current }, tracked: true });
         }
         const tone: Tone = frame.lost ? "neutral" : frame.holding ? "good" : "warn";
-        arc.current?.set(frame.heldMs / 1000 / target, tone, frame.value === null ? "" : `${Math.round(frame.value)}°`);
+        arc.current?.set((base.done + frame.heldMs / 1000) / target, tone, frame.value === null ? "" : `${Math.round(frame.value)}°`);
         return tone;
       }
 
@@ -185,7 +196,7 @@ function CameraCoach({
       arc.current?.set(frame.progress, tone, frame.value === null ? "" : `${Math.round(frame.value)}°`);
       return tone;
     },
-    [tracker, handleEvents, isHold, onStats, target],
+    [base.done, tracker, handleEvents, isHold, onStats, target],
   );
 
   const { videoRef, canvasRef, state, error } = usePoseCamera({ enabled: true, model, onFrame });

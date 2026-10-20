@@ -39,7 +39,30 @@ const SOURCES = [
   { label: "Spot reduction: overview of the evidence", href: "https://www.wikipedia.org/wiki/Spot_reduction" },
   { label: "Is spot reduction a myth?", href: "https://www.bulknutrients.com.au/blog/weight-loss/is-spot-reduction-actually-a-myth" },
   { label: "Strength plan structure: non-consecutive days, gradual load", href: "https://fitnessista.com/wp-content/uploads/2026/05/strength-plan-for-women-over-35.pdf" },
+  { label: "Dose-response of weekly training volume and muscle growth (Schoenfeld et al., meta-analysis)", href: "https://researchgate.net/profile/Brad-Schoenfeld/publication/305455324_Dose-response_relationship_between_weekly_resistance_training_volume_and_increases_in_muscle_mass_A_systematic_review_and_meta-analysis/links/59dc0269458515e9ab4527d6/Dose-response-relationship-between-weekly-resistance-training-volume-and-increases-in-muscle-mass-A-systematic-review-and-meta-analysis.pdf" },
+  { label: "Evidence-based guidelines for training volume (Sports, 2018)", href: "https://dx.doi.org/10.3390/sports6010007" },
+  { label: "Rep ranges for muscle growth: closeness to failure matters most", href: "https://mennohenselmans.com/the-optimal-rep-range-for-muscle-growth-isnt-what-you-think/" },
+  { label: "Light vs heavy loads for hypertrophy", href: "https://fitnessvolt.com/light-vs-heavy-hypertrophy-training/" },
   { label: "MediaPipe Pose Landmarker (the on-device vision model)", href: "https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js" },
+];
+
+const PPL_POINTS = [
+  {
+    title: "Each muscle twice a week",
+    body: "Studies comparing training frequency found twice a week builds more muscle than once. Push, Pull and Legs train their muscles directly, and the Arms & shoulders day hits triceps, biceps and delts a second time. Romanian deadlifts on Pull day give your legs a second session too.",
+  },
+  {
+    title: "About 10 or more hard sets per muscle",
+    body: "Muscle growth rises with weekly sets, with clear evidence up to around 10 sets per muscle per week. The plan starts near that and climbs through Build and Strength.",
+  },
+  {
+    title: "Close to failure, any rep range",
+    body: "Sets of roughly 6 to 30 reps all build muscle when they finish close to failure. At home that's the point: lighter dumbbells still work if the last reps are hard. Stop each set with 1–2 reps left in the tank.",
+  },
+  {
+    title: "Add weight when it gets easy",
+    body: "Log the dumbbell weight for each set. When you hit the top of the rep target on every set, go up a step next session. The Strength table on Progress shows how far you've come.",
+  },
 ];
 
 export default function SciencePage() {
@@ -48,10 +71,12 @@ export default function SciencePage() {
       <header className="pt-4">
         <h1 className="font-scoreboard text-[clamp(3rem,12vw,4.75rem)] font-extrabold uppercase">Why this plan works</h1>
         <p className="mt-4 max-w-[60ch] text-lg">
-          Training can change a lot about your shape, but not everything the internet promises. Here is what this plan
+          Training can change a lot about your body, but not everything the internet promises. Here is what each plan
           can change and what it can&apos;t, so you know what to expect.
         </p>
       </header>
+
+      <h2 className="-mb-6 text-sm font-semibold text-muted">Glutes, thighs, chest &amp; waist plan</h2>
 
       {GOALS.map((g) => (
         <section key={g.title} aria-labelledby={`g-${g.title}`} className="grid gap-4 sm:grid-cols-[9rem_1fr]">
@@ -72,6 +97,26 @@ export default function SciencePage() {
           </dl>
         </section>
       ))}
+
+      <section aria-labelledby="ppl" className="max-w-[62ch]">
+        <h2 id="ppl" className="font-scoreboard text-4xl font-bold uppercase">Push / Pull / Legs plan</h2>
+        <p className="mt-3">
+          The muscle-building plan follows the most consistent findings in strength research. It needs a pair of
+          dumbbells, and a pull-up bar from week 3 (rows under a sturdy table work if you don&apos;t have one).
+        </p>
+        <dl className="mt-5 flex flex-col gap-4">
+          {PPL_POINTS.map((p) => (
+            <div key={p.title}>
+              <dt className="font-semibold">{p.title}</dt>
+              <dd className="mt-1 text-muted">{p.body}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-4 text-sm text-muted">
+          What it doesn&apos;t change: you can&apos;t burn fat from one spot, and visible abs depend on overall body fat
+          more than on ab exercises.
+        </p>
+      </section>
 
       <section aria-labelledby="camera" className="max-w-[62ch]">
         <h2 id="camera" className="font-scoreboard text-4xl font-bold uppercase">How the camera counts</h2>

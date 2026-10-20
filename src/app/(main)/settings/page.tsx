@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { deleteEverything, exportBackup, importBackup, saveProfile, type Profile } from "@/lib/db";
+import { GenderPicker, PlanPicker } from "@/components/profile-fields";
 import { useProfile } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,13 @@ export default function SettingsPage() {
               className="h-11 max-w-sm rounded-xl border border-line bg-surface px-3 outline-none focus:border-primary"
             />
           </label>
+          <GenderPicker value={profile.gender} onChange={(gender) => update({ gender })} />
+          <div>
+            <PlanPicker value={profile.plan} onChange={(plan) => update({ plan })} />
+            <p className="mt-2 text-sm text-muted">
+              Switching keeps your history. Each plan remembers which of its sessions you&apos;ve done.
+            </p>
+          </div>
           <Choice
             label="Voice coaching"
             value={profile.voice ? "on" : "off"}
