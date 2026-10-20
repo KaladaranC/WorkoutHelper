@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, Camera, Hand, SkipForward, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Camera, ChevronDown, Hand, SkipForward, X } from "lucide-react";
 import { CoachPanel, type CoachStats } from "@/components/coach/coach-panel";
 import { bandClass } from "@/components/band";
 import { MoveAnimation } from "@/components/figure/move-animation";
@@ -171,21 +171,11 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
 
       <section aria-labelledby="moves">
         <h2 id="moves" className="text-sm font-semibold text-stage-muted">Moves</h2>
+        <p className="mt-1 text-sm text-stage-muted">Tap a move to see how to do it.</p>
         <ol className="mt-2 divide-y divide-white/10 border-y border-white/10">
           {day.items.map((p) => (
-            <li key={p.exercise.id} className="flex items-center gap-4 py-2.5">
-              <MoveThumb id={p.exercise.id} className="h-12 w-16" />
-              <span className="flex-1 font-semibold">{p.exercise.name}</span>
-              <span className="font-mono text-sm tabular-nums text-stage-muted">
-                {p.sets}×{p.amount}
-                {p.exercise.unit === "seconds" ? "s" : ""}
-                {p.exercise.perSide ? "/side" : ""}
-              </span>
-              {p.exercise.tracking.kind === "manual" ? (
-                <Hand className="size-4 text-stage-muted" aria-label="Counted by hand" />
-              ) : (
-                <Camera className="size-4" aria-label="Counted by camera" />
-              )}
+            <li key={p.exercise.id}>
+              <MoveRow p={p} />
             </li>
           ))}
         </ol>
@@ -204,6 +194,61 @@ function Overview({ day, sessions, onStart }: { day: ProgramDay; sessions: Sessi
         {active ? "Resume session" : "I'm warmed up, start"} <ArrowRight className="size-5" />
       </button>
     </div>
+  );
+}
+
+/** A move in the session list that opens in place to show the tutorial. */
+function MoveRow({ p }: { p: Prescription }) {
+  const [open, setOpen] = useState(false);
+  const e = p.exercise;
+  const panelId = `how-${e.id}`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex w-full items-center gap-4 py-2.5 text-left hover:bg-white/5"
+      >
+        <MoveThumb id={e.id} className="h-12 w-16" />
+        <span className="flex-1 font-semibold">{e.name}</span>
+        <span className="font-mono text-sm tabular-nums text-stage-muted">
+          {p.sets}×{p.amount}
+          {e.unit === "seconds" ? "s" : ""}
+          {e.perSide ? "/side" : ""}
+        </span>
+        {e.tracking.kind === "manual" ? (
+          <Hand className="size-4 text-stage-muted" aria-label="Counted by hand" />
+        ) : (
+          <Camera className="size-4" aria-label="Counted by camera" />
+        )}
+        <ChevronDown className={cn("size-4 text-stage-muted transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div id={panelId} className="flex flex-col gap-4 pb-5">
+          <MoveAnimation id={e.id} className="h-48 rounded-2xl bg-white/5 p-3" />
+          <ol className="flex list-decimal flex-col gap-2 pl-5 marker:font-mono marker:text-stage-muted">
+            {e.steps.map((s) => (
+              <li key={s} className="max-w-[60ch] pl-1">
+                {s}
+              </li>
+            ))}
+          </ol>
+          <p>
+            <span className="text-sm font-semibold text-stage-muted">Cues: </span>
+            {e.cues.join(" · ")}
+          </p>
+          <p className="text-sm text-stage-muted">
+            {e.tracking.kind === "manual" ? e.tracking.reason : e.tracking.setup}
+          </p>
+          <Link href={`/moves/${e.id}`} className="self-start text-sm font-semibold underline underline-offset-4">
+            Common mistakes and easier or harder versions
+          </Link>
+        </div>
+      )}
+    </>
   );
 }
 
