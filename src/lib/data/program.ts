@@ -65,7 +65,7 @@ const TEMPLATES: Record<PhaseId, DayTemplate[]> = {
     },
     {
       key: "b",
-      title: "Bust & posture",
+      title: "Chest & posture",
       focus: "Chest strength and an open upper back",
       slots: [
         s("incline-push-up", 3, 10),
@@ -119,7 +119,7 @@ const TEMPLATES: Record<PhaseId, DayTemplate[]> = {
     },
     {
       key: "b",
-      title: "Bust & posture",
+      title: "Chest & posture",
       focus: "Push-up strength",
       slots: [
         s("knee-push-up", 3, 10),
@@ -174,7 +174,7 @@ const TEMPLATES: Record<PhaseId, DayTemplate[]> = {
     },
     {
       key: "b",
-      title: "Bust & posture",
+      title: "Chest & posture",
       focus: "Full push-ups and a burnout set",
       slots: [
         s("push-up", 4, 6),

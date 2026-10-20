@@ -21,7 +21,7 @@ export type Exercise = {
 };
 
 export const GOAL_LABEL: Record<Goal, string> = {
-  bust: "Bust & posture",
+  bust: "Chest & bust",
   waist: "Waist & core",
   glutes: "Glutes",
   thighs: "Thighs",
