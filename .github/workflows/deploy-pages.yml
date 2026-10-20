@@ -18,19 +18,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # The lockfile is written on Windows; if its platform-specific optional
+      # packages don't line up with Linux, fall back to a regular install.
+      - run: npm ci || npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build
         env:
           # Pages serves project sites under /<repo-name>
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: out
 
